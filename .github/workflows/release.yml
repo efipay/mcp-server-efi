@@ -102,7 +102,7 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: mcp-server-efi:release-preflight
-          trivy-version: v0.72.0
+          version: v0.72.0
           format: table
           exit-code: '1'
           ignore-unfixed: true
@@ -184,7 +184,7 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
-          trivy-version: v0.72.0
+          version: v0.72.0
           format: table
           exit-code: '1'
           ignore-unfixed: true

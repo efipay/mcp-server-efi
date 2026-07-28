@@ -248,7 +248,8 @@ describe('distribuição', () => {
       'docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c',
     );
     expect(workflow).toContain('docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a');
-    expect(workflow.match(/trivy-version: v0\.72\.0/g)).toHaveLength(2);
+    expect(workflow.match(/^\s+version: v0\.72\.0$/gm)).toHaveLength(2);
+    expect(workflow).not.toContain('trivy-version:');
   });
 
   it('publica e anexa exatamente os artefatos auditados e conferidos por checksum', () => {
