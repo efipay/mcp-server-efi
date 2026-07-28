@@ -20,8 +20,6 @@ O catálogo cobre 173 métodos. Por segurança, 170 tools são registradas por p
 | Abertura de Contas  |              7 |                0 |
 | Extratos            |              6 |                0 |
 
-O inventário SDK → tool → domínio → contexto está em [docs/tool-coverage.md](docs/tool-coverage.md). As decisões de protocolo e sua origem estão em [docs/architecture.md](docs/architecture.md).
-
 Os nomes das tools usam `snake_case`. A entrada mantém o envelope `{ params, body }` apenas com as partes aplicáveis; mutações Open Finance compatíveis também aceitam `idempotency_key`. Quando ela é omitida, o servidor gera uma chave criptograficamente segura e a devolve no sucesso ou erro para permitir uma repetição consciente da mesma operação.
 
 ## Requisitos
@@ -214,6 +212,9 @@ npm audit --audit-level=low
 npm run audit:artifact
 ```
 
+`npm run catalog:report` atualiza `docs/tool-coverage.md` somente no ambiente
+local. A pasta `docs/` é ignorada pelo Git e não integra o código publicado.
+
 Para auditar sem reempacotar um arquivo já produzido:
 
 ```bash
@@ -232,4 +233,3 @@ npm run mirror:check -- /caminho/para/o/outro/clone
 - Mantenha `validate-mtls=true`, salvo quando o fluxo Efí aplicável exigir configuração sem validação mTLS.
 - A auditoria do pacote consumidor aceita temporariamente apenas o advisory Hono documentado em [SECURITY.md](SECURITY.md); qualquer outro advisory bloqueia a publicação.
 - Consulte [MIGRATION.md](MIGRATION.md) antes de migrar de versões 0.x.
-- O procedimento de tag e os pré-requisitos dos três canais estão em [docs/releasing.md](docs/releasing.md).

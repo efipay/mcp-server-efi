@@ -1,10 +1,11 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import process from 'node:process';
 import { fileURLToPath, URL } from 'node:url';
 import { API_GROUPS, TOOL_CATALOG } from '../dist/src/catalog/index.js';
 import { descriptionSourceFor } from './descriptionSources.mjs';
 
 const reportUrl = new URL('../docs/tool-coverage.md', import.meta.url);
+const reportDirectoryUrl = new URL('../docs/', import.meta.url);
 
 const apiLabels = {
   cobrancas: 'Cobranças',
@@ -54,19 +55,22 @@ export function coverageReport() {
 }
 
 async function main() {
-  const expected = coverageReport();
+  const report = coverageReport();
   if (process.argv.includes('--check')) {
-    const current = await readFile(reportUrl, 'utf8').catch(() => '');
-    if (current !== expected) {
-      process.stderr.write(
-        `Relatório desatualizado: execute node ${fileURLToPath(import.meta.url)} --write.\n`,
+    const inventoryRows = report
+      .split('\n')
+      .filter((line) => line.startsWith('| `') && line.includes(' | `'));
+    if (inventoryRows.length !== TOOL_CATALOG.length) {
+      throw new Error(
+        `Relatório inconsistente: ${inventoryRows.length} linhas para ${TOOL_CATALOG.length} tools.`,
       );
-      process.exitCode = 1;
     }
     return;
   }
 
-  await writeFile(reportUrl, expected);
+  await mkdir(reportDirectoryUrl, { recursive: true });
+  await writeFile(reportUrl, report);
+  process.stdout.write(`Relatório local atualizado em ${fileURLToPath(reportUrl)}.\n`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

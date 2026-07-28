@@ -81,8 +81,8 @@ jobs:
         shell: bash
         run: |
           npm run mcpb:pack
-          CREATED_PACKAGE="$(npm pack --ignore-scripts --json | node --input-type=module -e 'let source = ""; for await (const chunk of process.stdin) source += chunk; process.stdout.write(JSON.parse(source)[0].filename);')"
-          test "$CREATED_PACKAGE" = "$PACKAGE_FILE"
+          npm pack --ignore-scripts --pack-destination .
+          test -f "$PACKAGE_FILE"
           unzip -t "$MCPB_FILE"
           npm run audit:artifact -- "./$PACKAGE_FILE"
 

@@ -255,7 +255,9 @@ describe('distribuição', () => {
   it('publica e anexa exatamente os artefatos auditados e conferidos por checksum', () => {
     const workflow = read('.github/workflows/release.yml');
 
-    expect(workflow.match(/npm pack --ignore-scripts --json/g)).toHaveLength(1);
+    expect(workflow.match(/npm pack --ignore-scripts --pack-destination \./g)).toHaveLength(1);
+    expect(workflow).not.toContain('npm pack --ignore-scripts --json');
+    expect(workflow).toContain('test -f "$PACKAGE_FILE"');
     expect(workflow).toContain('npm run audit:artifact -- "./$PACKAGE_FILE"');
     expect(workflow).toContain('npm publish "./$PACKAGE_FILE" --access public --provenance');
     expect(workflow).toContain('"release-artifacts/$PACKAGE_FILE"');
