@@ -1,0 +1,6 @@
+dist
+node_modules
+contexto
+coverage
+docs/tool-coverage.md
+package-lock.json

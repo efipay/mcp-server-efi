@@ -1,8 +1,27 @@
 {
   "name": "mcp-server-efi",
-  "version": "0.0.4",
+  "version": "1.0.0",
   "description": "Um serviço que permite o consumo das APIs do Efí Bank através de um servidor MCP.",
   "author": "João Lucas Alberto Muniz",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/efipay/mcp-server-efi-bank.git"
+  },
+  "homepage": "https://github.com/efipay/mcp-server-efi-bank#readme",
+  "bugs": {
+    "url": "https://github.com/efipay/mcp-server-efi-bank/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "efi",
+    "pix",
+    "open-finance"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "type": "module",
   "bin": {
     "mcp-server-efi": "dist/src/index.js"
@@ -10,34 +29,48 @@
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "start": "node --no-warnings dist/index.js",
-    "dev": "node --inspect --watch src/index.ts",
-    "build": "node -e \"const fs = require('fs'); fs.rmSync('dist', { recursive: true, force: true });\" && tsc && shx chmod +x dist/src/*.js",
+    "start": "node --no-warnings dist/src/index.js",
+    "dev": "node --experimental-strip-types --watch src/index.ts",
+    "clean": "node -e \"const fs = require('node:fs'); fs.rmSync('dist', { recursive: true, force: true });\"",
+    "build": "npm run clean && tsc && node -e \"require('node:fs').chmodSync('dist/src/index.js', 0o755)\"",
+    "typecheck:contracts": "tsc -p tsconfig.typecheck.json",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "catalog:report": "npm run build --silent && node scripts/report.mjs --write",
+    "catalog:check": "npm run build --silent && node scripts/report.mjs --check",
+    "check": "npm run lint && npm run format:check && npm run typecheck:contracts && npm run test:coverage && npm run catalog:check",
+    "audit": "npm audit --audit-level=low",
+    "audit:artifact": "node scripts/audit-package.mjs",
+    "mcpb:pack": "npm run build && node scripts/build-mcpb.mjs",
+    "mirror:check": "node scripts/check-mirror.mjs",
     "prepare": "npm run build",
     "watch": "tsc --watch"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.5.0",
-    "json-schema-to-zod": "^2.6.1",
-    "minimist": "^1.2.8",
-    "sdk-node-apis-efi": "^1.2.20",
-    "zod": "^3.22.4"
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "jose": "6.2.4",
+    "pix-qr-code-detail": "1.2.0",
+    "sdk-node-apis-efi": "2.0.0",
+    "zod": "4.4.3"
   },
   "devDependencies": {
-    "@types/minimist": "^1.2.5",
-    "@types/node": "^20.17.30",
-    "eslint": "^8.2.0",
-    "eslint-config-airbnb": "^19.0.4",
-    "eslint-config-prettier": "^10.1.2",
-    "eslint-plugin-import": "^2.25.3",
-    "eslint-plugin-jsx-a11y": "^6.5.1",
-    "eslint-plugin-prettier": "^5.2.6",
-    "eslint-plugin-react": "^7.28.0",
-    "eslint-plugin-react-hooks": "^4.3.0",
-    "prettier": "^3.5.3",
-    "shx": "^0.3.4",
-    "typescript": "^5.8.3"
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.19.11",
+    "@vitest/coverage-v8": "4.1.10",
+    "eslint": "10.8.0",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.65.0",
+    "vitest": "4.1.10"
+  },
+  "overrides": {
+    "@hono/node-server": "2.0.11"
   },
   "license": "MIT"
 }
