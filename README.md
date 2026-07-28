@@ -1,11 +1,12 @@
 # Servidor MCP Efí
 
-Servidor `stdio` que disponibiliza as APIs da Efí pelo Model Context Protocol (MCP). Os contratos públicos vêm do `sdk-node-apis-efi@2.0.0`; a documentação Efí é usada para redigir descrições úteis, sem alterar tipos ou validações do SDK.
+Servidor MCP oficial da Efí, executado via `stdio`, que disponibiliza as APIs da
+Efí pelo Model Context Protocol (MCP). Os contratos públicos vêm do
+`sdk-node-apis-efi@2.0.0`; a documentação Efí é usada para redigir descrições
+úteis, sem alterar tipos ou validações do SDK.
 
-O repositório canônico e a origem dos pacotes publicados é
-[`efipay/mcp-server-efi`](https://github.com/efipay/mcp-server-efi). O
-espelho `JoaoLucasAl/mcp-server-efi` preserva um histórico independente e recebe o
-mesmo código e as mesmas tags, mas nunca executa deploy.
+Este é o [repositório oficial do projeto](https://github.com/efipay/mcp-server-efi)
+e a origem dos pacotes publicados pela Efí.
 
 ## Cobertura
 
@@ -30,22 +31,23 @@ Os nomes das tools usam `snake_case`. A entrada mantém o envelope `{ params, bo
 
 ## Credenciais e execução pela CLI
 
-Credenciais não são aceitas em argumentos da linha de comando, pois argumentos podem aparecer no histórico do shell e na lista de processos. Copie o modelo, preencha-o e mantenha o arquivo fora do controle de versão:
+Credenciais não são aceitas em argumentos da linha de comando, pois argumentos
+podem aparecer no histórico do shell e na lista de processos. Crie um arquivo
+local `.env.efi`, mantenha-o fora do controle de versão e restrinja sua leitura:
+
+```dotenv
+EFI_CLIENT_ID=seu_client_id
+EFI_CLIENT_SECRET=seu_client_secret
+EFI_SANDBOX=true
+EFI_CERTIFICATE=/caminho/absoluto/certificado.p12
+```
 
 ```bash
-cp .env.example .env.efi
 chmod 600 .env.efi
 ```
 
-Após compilar o projeto, o Node 22 pode carregar esse arquivo nativamente com
-[`--env-file`](https://nodejs.org/download/release/v22.18.0/docs/api/cli.html#--env-fileconfig):
-
-```bash
-npm run build
-node --env-file=.env.efi dist/src/index.js --apis=pix,open-finance
-```
-
-Para executar o pacote com `npx`, exporte o mesmo arquivo para o ambiente do processo:
+Para executar o pacote com `npx`, carregue o arquivo somente no ambiente do
+processo:
 
 ```bash
 set -a
@@ -70,6 +72,11 @@ Somente opções não secretas possuem flags. Sua precedência é `CLI > EFI_* >
 | `-h`, `--help`    | —                   | —               | —           |
 
 Booleanos aceitam `true`, `false`, `1` e `0`.
+
+O mTLS é usado na comunicação com os endpoints que recebem webhooks compatíveis.
+A opção `validate-mtls` deve permanecer em `true` para manter essa proteção;
+quando definida como `false`, o SDK envia o bypass de validação somente durante a
+configuração do webhook. Por segurança, não recomendamos desabilitá-la.
 
 Material de autenticação e valores sensíveis são aceitos exclusivamente pelas seguintes variáveis, sem flags ou aliases sem o prefixo `EFI_`:
 
@@ -149,45 +156,32 @@ runtime contém o executável `node` e as dependências de produção, mas não 
 gerenciador de pacotes.
 
 ```bash
-docker build -t mcp-server-efi:1.0.0 .
+docker pull ghcr.io/efipay/mcp-server-efi:1.0.0
 
 docker run -i --rm \
   --env-file .env.efi \
   --mount type=bind,source=/caminho/absoluto/certificado.p12,target=/run/secrets/efi.p12,readonly \
   --env EFI_CERTIFICATE=/run/secrets/efi.p12 \
-  mcp-server-efi:1.0.0 \
+  ghcr.io/efipay/mcp-server-efi:1.0.0 \
   --apis=pix,open-finance
 ```
 
-O bind mount torna o caminho do certificado válido dentro do contêiner; ele deve ser legível pelo usuário `node`. Como alternativa, grave o certificado em base64 no arquivo de ambiente e use `EFI_CERT_BASE64=true`, sem mount. O arquivo `.dockerignore` impede que arquivos `.env` e formatos usuais de certificados sejam enviados no contexto de build.
+O bind mount torna o caminho do certificado válido dentro do contêiner; ele deve
+ser legível pelo usuário `node`. Como alternativa, grave o certificado em base64
+no arquivo de ambiente e use `EFI_CERT_BASE64=true`, sem mount.
 
-## Smithery e MCPB
+## Instalação via Smithery e MCPB
 
-Servidores locais `stdio` podem ser distribuídos pelo Smithery como MCP Bundle,
-sem uma URL pública. O [manifesto MCPB 0.3](manifest.json) marca credenciais e
-certificados como configurações sensíveis e os encaminha ao processo por `EFI_*`,
-nunca por `args`.
+Na instalação pelo Smithery, o servidor é fornecido como MCP Bundle e executado
+localmente via `stdio`, sem uma URL pública. O [manifesto MCPB 0.3](manifest.json)
+marca credenciais e certificados como configurações sensíveis e os encaminha ao
+processo por `EFI_*`, nunca por `args`.
 
 O instalador MCPB seleciona somente `cobrancas` por padrão. Por isso ele pode iniciar
 sem certificado mTLS; ao acrescentar Pix, Open Finance, Pagamento de Contas, Abertura
 de Contas ou Extratos, o certificado volta a ser obrigatório. Esse padrão é
 deliberadamente diferente da CLI: sem `--apis` ou `EFI_APIS`, a CLI habilita os seis
 domínios.
-
-```bash
-npx --yes smithery@1.2.0 auth login
-npx --yes smithery@1.2.0 auth whoami
-npx --yes smithery@1.2.0 namespace use efipay
-npm run mcpb:pack
-VERSION="$(node -p "require('./package.json').version")"
-npx --yes smithery@1.2.0 mcp publish \
-  "./mcp-server-efi-$VERSION.mcpb" \
-  -n efipay/mcp-server-efi
-```
-
-O mesmo bundle é publicado no Smithery e anexado ao GitHub Release. Nunca informe
-a chave do Smithery em `args`, no manifesto ou em arquivo rastreado. Em CI, use
-exclusivamente o secret `SMITHERY_API_KEY` do repositório canônico.
 
 ## Contratos e respostas MCP
 
@@ -199,37 +193,12 @@ exclusivamente o secret `SMITHERY_API_KEY` do repositório canônico.
 - Falhas de validação ou da Efí retornam `isError: true`, com dados sensíveis sanitizados.
 - `stdout` é reservado ao protocolo; mensagens operacionais são escritas em `stderr`.
 
-Os arquivos em `contexto/` são insumo de desenvolvimento para descrições e rastreabilidade. Eles não são carregados em runtime, publicados como MCP Resources ou usados como fonte de contratos.
-
-## Desenvolvimento e segurança
-
-```bash
-npm ci
-npm run check
-npm run catalog:report
-npm pack --dry-run
-npm audit --audit-level=low
-npm run audit:artifact
-```
-
-`npm run catalog:report` atualiza `docs/tool-coverage.md` somente no ambiente
-local. A pasta `docs/` é ignorada pelo Git e não integra o código publicado.
-
-Para auditar sem reempacotar um arquivo já produzido:
-
-```bash
-npm run audit:artifact -- ./mcp-server-efi-1.0.0.tgz
-```
-
-Depois que os commits equivalentes existirem nos dois clones limpos, confira a
-versão, a lista de arquivos rastreados e o hash da árvore:
-
-```bash
-npm run mirror:check -- /caminho/para/o/outro/clone
-```
+## Segurança e atualização
 
 - Não são aceitos headers arbitrários nas tools.
-- Não registre credenciais, tokens, certificados ou conteúdo PEM no repositório ou em logs.
-- Mantenha `validate-mtls=true`, salvo quando o fluxo Efí aplicável exigir configuração sem validação mTLS.
-- A auditoria do pacote consumidor aceita temporariamente apenas o advisory Hono documentado em [SECURITY.md](SECURITY.md); qualquer outro advisory bloqueia a publicação.
+- Não registre credenciais, tokens, certificados ou conteúdo PEM em arquivos
+  versionados ou logs.
+- Mantenha `validate-mtls=true`; o mTLS protege a comunicação dos webhooks
+  compatíveis e, por segurança, não recomendamos desabilitá-lo.
+- Consulte a [política de segurança](SECURITY.md) para comunicar vulnerabilidades.
 - Consulte [MIGRATION.md](MIGRATION.md) antes de migrar de versões 0.x.

@@ -100,7 +100,7 @@
     "validate_mtls": {
       "type": "boolean",
       "title": "Validar mTLS",
-      "description": "Mantém a validação mTLS nos fluxos de webhook compatíveis.",
+      "description": "Mantém a proteção mTLS nos webhooks compatíveis. Por segurança, não recomendamos desabilitá-la.",
       "default": true,
       "required": false
     },

@@ -233,7 +233,7 @@ Opções:
   --sandbox=<true|false>       Ambiente de homologação ou produção (obrigatório)
   --apis=<lista>               cobrancas,pix,open-finance,pagamento-contas,abertura-contas,extratos
   --cert-base64=<true|false>   Certificado e PEM estão em base64 (padrão: true)
-  --validate-mtls=<booleano>   Validação mTLS para webhooks (padrão: true)
+  --validate-mtls=<booleano>   Proteção mTLS dos webhooks (padrão/recomendado: true)
   --cache=<true|false>         Cache OAuth do SDK (padrão: true)
   -h, --help                   Exibe esta ajuda
 
