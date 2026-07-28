@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.github
+contexto
+coverage
+.env*
+*.p12
+*.pfx
+*.pem
+*.key
+*.log

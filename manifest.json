@@ -1,0 +1,135 @@
+{
+  "manifest_version": "0.3",
+  "name": "mcp-server-efi",
+  "display_name": "Servidor MCP Efí",
+  "version": "1.0.0",
+  "description": "Acesso tipado às APIs da Efí por meio do Model Context Protocol.",
+  "long_description": "Servidor local stdio com cobertura integral do SDK Node Efí 2.0.0. Expõe Cobranças, Pix, Open Finance, Pagamento de Contas, Abertura de Contas e Extratos, com contratos Zod oficiais e respostas sensíveis ocultas por padrão.",
+  "author": {
+    "name": "João Lucas Alberto Muniz"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/efipay/mcp-server-efi.git"
+  },
+  "homepage": "https://github.com/efipay/mcp-server-efi",
+  "documentation": "https://github.com/efipay/mcp-server-efi#readme",
+  "support": "https://github.com/efipay/mcp-server-efi/issues",
+  "privacy_policies": ["https://sejaefi.com.br/termos-e-contratos/politica-de-privacidade"],
+  "keywords": ["efi", "pix", "open-finance", "banking", "payments"],
+  "license": "MIT",
+  "tools_generated": true,
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=22"
+    }
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "dist/src/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/src/index.js"],
+      "env": {
+        "EFI_CLIENT_ID": "${user_config.client_id}",
+        "EFI_CLIENT_SECRET": "${user_config.client_secret}",
+        "EFI_SANDBOX": "${user_config.sandbox}",
+        "EFI_CERTIFICATE": "${user_config.certificate}",
+        "EFI_PEM_KEY": "${user_config.pem_key}",
+        "EFI_PARTNER_TOKEN": "${user_config.partner_token}",
+        "EFI_CERT_BASE64": "${user_config.cert_base64}",
+        "EFI_VALIDATE_MTLS": "${user_config.validate_mtls}",
+        "EFI_CACHE": "${user_config.cache}",
+        "EFI_APIS": "${user_config.apis}",
+        "EFI_SENSITIVE_TOOLS": "${user_config.sensitive_tools}",
+        "EFI_ACCEPT_SENSITIVE_OUTPUT_RISK": "${user_config.accept_sensitive_output_risk}"
+      }
+    }
+  },
+  "user_config": {
+    "client_id": {
+      "type": "string",
+      "title": "Client ID Efí",
+      "description": "Client ID da aplicação Efí.",
+      "sensitive": true,
+      "required": true
+    },
+    "client_secret": {
+      "type": "string",
+      "title": "Client Secret Efí",
+      "description": "Client Secret da aplicação Efí.",
+      "sensitive": true,
+      "required": true
+    },
+    "sandbox": {
+      "type": "boolean",
+      "title": "Ambiente de homologação",
+      "description": "Ative para usar o sandbox Efí.",
+      "default": true,
+      "required": true
+    },
+    "certificate": {
+      "type": "string",
+      "title": "Certificado mTLS",
+      "description": "Conteúdo base64 ou caminho absoluto do certificado. Pode ser omitido apenas com a API cobrancas isolada.",
+      "sensitive": true,
+      "required": false
+    },
+    "pem_key": {
+      "type": "string",
+      "title": "Chave PEM",
+      "description": "Chave privada separada quando o certificado usa PEM.",
+      "sensitive": true,
+      "required": false
+    },
+    "partner_token": {
+      "type": "string",
+      "title": "Partner Token",
+      "description": "Token de parceiro Efí, quando aplicável.",
+      "sensitive": true,
+      "required": false
+    },
+    "cert_base64": {
+      "type": "boolean",
+      "title": "Certificado em base64",
+      "description": "Indica que certificado e chave PEM contêm base64 em vez de caminhos.",
+      "default": true,
+      "required": false
+    },
+    "validate_mtls": {
+      "type": "boolean",
+      "title": "Validar mTLS",
+      "description": "Mantém a validação mTLS nos fluxos de webhook compatíveis.",
+      "default": true,
+      "required": false
+    },
+    "cache": {
+      "type": "boolean",
+      "title": "Cache OAuth",
+      "description": "Habilita o cache de tokens OAuth do SDK.",
+      "default": true,
+      "required": false
+    },
+    "apis": {
+      "type": "string",
+      "title": "APIs habilitadas",
+      "description": "Lista separada por vírgulas. O pacote MCPB inicia somente Cobranças por padrão; amplie a lista para habilitar outros domínios.",
+      "default": "cobrancas",
+      "required": false
+    },
+    "sensitive_tools": {
+      "type": "string",
+      "title": "Tools com saída sensível",
+      "description": "Allowlist explícita: create_account_certificate, get_account_credentials e/ou create_sftp_key.",
+      "required": false
+    },
+    "accept_sensitive_output_risk": {
+      "type": "string",
+      "title": "Aceite de saída sensível",
+      "description": "Informe exatamente I_UNDERSTAND para habilitar a allowlist de saídas sensíveis.",
+      "sensitive": true,
+      "required": false
+    }
+  }
+}

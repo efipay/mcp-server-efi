@@ -5,11 +5,11 @@
   "author": "João Lucas Alberto Muniz",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/efipay/mcp-server-efi-bank.git"
+    "url": "git+https://github.com/efipay/mcp-server-efi.git"
   },
-  "homepage": "https://github.com/efipay/mcp-server-efi-bank#readme",
+  "homepage": "https://github.com/efipay/mcp-server-efi#readme",
   "bugs": {
-    "url": "https://github.com/efipay/mcp-server-efi-bank/issues"
+    "url": "https://github.com/efipay/mcp-server-efi/issues"
   },
   "keywords": [
     "mcp",

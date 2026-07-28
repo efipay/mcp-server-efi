@@ -3,13 +3,19 @@
     "mcp-server-efi": {
       "command": "node",
       "args": [
-        "path\\to\\mcp-server-efi\\dist\\src\\index.js",
-        "--sandbox=false",
-        "--client-id=Client_Id_...",
-        "--client-secret=Client_Secret_..",
-        "--certificate=Certificado em Base64",
-        "--validate-mtls=true"
-      ]
-    }
-  }
+        "/caminho/absoluto/mcp-server-efi/dist/src/index.js",
+        "--sandbox=true",
+        "--apis=cobrancas,pix,open-finance,pagamento-contas,abertura-contas,extratos",
+        "--cert-base64=false",
+        "--validate-mtls=true",
+        "--cache=true",
+      ],
+      // Prefira o mecanismo de segredos do host, caso exista, aos valores literais.
+      "env": {
+        "EFI_CLIENT_ID": "Client_Id_...",
+        "EFI_CLIENT_SECRET": "Client_Secret_...",
+        "EFI_CERTIFICATE": "/caminho/absoluto/certificado.p12",
+      },
+    },
+  },
 }
