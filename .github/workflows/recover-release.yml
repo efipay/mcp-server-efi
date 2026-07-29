@@ -126,16 +126,19 @@ jobs:
             sort > allowed-files.txt
           diff -u allowed-files.txt expected-files.txt
 
-      - name: Impedir duplicação ou substituição de release
+      - name: Detectar release existente sem alterá-la
+        id: release-state
         shell: bash
         run: |
           set -euo pipefail
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "A release $RELEASE_TAG já existe; recuperação cancelada." >&2
-            exit 1
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Criar o GitHub Release definitivo
+        if: steps.release-state.outputs.exists != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -149,10 +152,20 @@ jobs:
             --title "mcp-server-efi $VERSION" \
             --notes-file CHANGELOG.md
 
-      - name: Verificar os assets publicados contra os arquivos originais
+      - name: Verificar metadados e digests dos assets publicados
         shell: bash
         run: |
           set -euo pipefail
+          RELEASE_JSON="$(
+            gh release view "$RELEASE_TAG" \
+              --json tagName,name,isDraft,isPrerelease,assets
+          )"
+          test "$(jq -r '.tagName' <<<"$RELEASE_JSON")" = "$RELEASE_TAG"
+          test "$(jq -r '.name' <<<"$RELEASE_JSON")" = "mcp-server-efi $VERSION"
+          test "$(jq -r '.isDraft' <<<"$RELEASE_JSON")" = false
+          test "$(jq -r '.isPrerelease' <<<"$RELEASE_JSON")" = false
+          test "$(jq '.assets | length' <<<"$RELEASE_JSON")" -eq 5
+
           for FILE in \
             "$PACKAGE_FILE" \
             "$MCPB_FILE" \
@@ -160,5 +173,22 @@ jobs:
             "$SBOM_FILE" \
             SHA256SUMS
           do
-            gh release verify-asset "$RELEASE_TAG" "$RUNNER_TEMP/release-artifacts/$FILE"
+            if test "$FILE" = SHA256SUMS; then
+              EXPECTED_DIGEST="sha256:$(
+                sha256sum "$RUNNER_TEMP/release-artifacts/$FILE" |
+                  cut -d ' ' -f 1
+              )"
+            else
+              EXPECTED_DIGEST="sha256:$(
+                awk -v file="$FILE" '$2 == file { print $1 }' \
+                  "$RUNNER_TEMP/release-artifacts/SHA256SUMS"
+              )"
+            fi
+            ACTUAL_DIGEST="$(
+              jq -r --arg name "$FILE" \
+                '.assets[] | select(.name == $name) | .digest' \
+                <<<"$RELEASE_JSON"
+            )"
+            test -n "$ACTUAL_DIGEST"
+            test "$ACTUAL_DIGEST" = "$EXPECTED_DIGEST"
           done

@@ -314,8 +314,11 @@ describe('distribuição', () => {
     expect(workflow).toContain('sha256sum --check SHA256SUMS');
     expect(workflow).not.toContain('ARTIFACT_DIR: ${{ runner.temp }}');
     expect(workflow).toContain('$RUNNER_TEMP/release-artifacts/$PACKAGE_FILE');
+    expect(workflow).toContain("if: steps.release-state.outputs.exists != 'true'");
     expect(workflow).toContain('gh release create "$RELEASE_TAG"');
-    expect(workflow).toContain('gh release verify-asset "$RELEASE_TAG"');
+    expect(workflow).toContain('.assets[] | select(.name == $name) | .digest');
+    expect(workflow).toContain('test "$ACTUAL_DIGEST" = "$EXPECTED_DIGEST"');
+    expect(workflow).not.toContain('gh release verify-asset');
     expect(workflow).not.toContain('npm publish');
     expect(workflow).not.toContain('docker build');
     expect(workflow).not.toContain('publish-smithery');
