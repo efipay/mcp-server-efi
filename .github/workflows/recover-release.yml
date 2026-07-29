@@ -1,0 +1,160 @@
+name: Recuperar GitHub Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag SemVer assinada que receberá o GitHub Release
+        required: true
+        type: string
+      source_run_id:
+        description: ID da execução de Release que produziu release-artifacts
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: recover-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  recover-release:
+    name: Publicar somente os artefatos imutáveis já validados
+    if: github.repository == 'efipay/mcp-server-efi'
+    permissions:
+      actions: read
+      contents: write
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+      ARTIFACT_DIR: ${{ runner.temp }}/release-artifacts
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      SBOM_FILE: mcp-server-efi-image.spdx.json
+    steps:
+      - name: Validar entradas antes de acessar o repositório
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validar versão, assinaturas e árvore do espelho pessoal
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/release-metadata.mjs \
+            --tag "$RELEASE_TAG" \
+            --github-env "$GITHUB_ENV"
+          test -s .github/allowed_signers
+
+          git config gpg.format ssh
+          git config gpg.ssh.allowedSignersFile "$GITHUB_WORKSPACE/.github/allowed_signers"
+
+          ORG_VERIFICATION="$(git verify-tag --raw "$RELEASE_TAG" 2>&1)"
+          printf '%s\n' "$ORG_VERIFICATION"
+          grep -Fq 'joao.muniz@gerencianet.com.br' <<<"$ORG_VERIFICATION"
+
+          PERSONAL_TAG="personal-$RELEASE_TAG"
+          git fetch --no-tags https://github.com/JoaoLucasAl/mcp-server-efi.git \
+            "refs/tags/$RELEASE_TAG:refs/tags/$PERSONAL_TAG"
+          PERSONAL_VERIFICATION="$(git verify-tag --raw "$PERSONAL_TAG" 2>&1)"
+          printf '%s\n' "$PERSONAL_VERIFICATION"
+          grep -Fq 'joaolucas.power@gmail.com' <<<"$PERSONAL_VERIFICATION"
+
+          test "$(git rev-parse "$RELEASE_TAG^{tree}")" = \
+            "$(git rev-parse "$PERSONAL_TAG^{tree}")"
+
+      - name: Vincular o artifact à execução original da tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_JSON="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          test "$(jq -r '.event' <<<"$RUN_JSON")" = push
+          test "$(jq -r '.status' <<<"$RUN_JSON")" = completed
+          test "$(jq -r '.head_branch' <<<"$RUN_JSON")" = "$RELEASE_TAG"
+          test "$(jq -r '.head_sha' <<<"$RUN_JSON")" = \
+            "$(git rev-list -n 1 "$RELEASE_TAG")"
+          test "$(jq -r '.path' <<<"$RUN_JSON")" = .github/workflows/release.yml
+
+          PREFLIGHT_CONCLUSION="$(
+            gh api --paginate \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/jobs" \
+              --jq '.jobs[] | select(.name == "Validar tag e produzir artefatos imutáveis") | .conclusion'
+          )"
+          test "$PREFLIGHT_CONCLUSION" = success
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: release-artifacts
+          path: ${{ runner.temp }}/release-artifacts
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: efipay/mcp-server-efi
+          run-id: ${{ inputs.source_run_id }}
+
+      - name: Conferir o conjunto exato e seus checksums
+        shell: bash
+        working-directory: ${{ runner.temp }}/release-artifacts
+        run: |
+          set -euo pipefail
+          sha256sum --check SHA256SUMS
+          test "$(wc -l < SHA256SUMS)" -eq 4
+          test -f "$PACKAGE_FILE"
+          test -f "$MCPB_FILE"
+          test -f "$SERVER_CARD_FILE"
+          test -f "$SBOM_FILE"
+
+          cut -d ' ' -f 3 SHA256SUMS | sort > expected-files.txt
+          printf '%s\n' \
+            "$MCPB_FILE" \
+            "$PACKAGE_FILE" \
+            "$SBOM_FILE" \
+            "$SERVER_CARD_FILE" |
+            sort > allowed-files.txt
+          diff -u allowed-files.txt expected-files.txt
+
+      - name: Impedir duplicação ou substituição de release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "A release $RELEASE_TAG já existe; recuperação cancelada." >&2
+            exit 1
+          fi
+
+      - name: Criar o GitHub Release definitivo
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" \
+            "$ARTIFACT_DIR/$PACKAGE_FILE" \
+            "$ARTIFACT_DIR/$MCPB_FILE" \
+            "$ARTIFACT_DIR/$SERVER_CARD_FILE" \
+            "$ARTIFACT_DIR/$SBOM_FILE" \
+            "$ARTIFACT_DIR/SHA256SUMS" \
+            --verify-tag \
+            --title "mcp-server-efi $VERSION" \
+            --notes-file CHANGELOG.md
+
+      - name: Verificar os assets publicados contra os arquivos originais
+        shell: bash
+        run: |
+          set -euo pipefail
+          for FILE in \
+            "$PACKAGE_FILE" \
+            "$MCPB_FILE" \
+            "$SERVER_CARD_FILE" \
+            "$SBOM_FILE" \
+            SHA256SUMS
+          do
+            gh release verify-asset "$RELEASE_TAG" "$ARTIFACT_DIR/$FILE"
+          done

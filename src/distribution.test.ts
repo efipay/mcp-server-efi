@@ -289,4 +289,32 @@ describe('distribuição', () => {
     expect(workflow).toContain('git rev-parse "$PERSONAL_TAG^{tree}"');
     expect(workflow).toContain("if: github.repository == 'efipay/mcp-server-efi'");
   });
+
+  it('recupera apenas o GitHub Release a partir de um artifact imutável da tag', () => {
+    const workflow = read('.github/workflows/recover-release.yml');
+
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain("if: github.repository == 'efipay/mcp-server-efi'");
+    expect(workflow).toMatch(/^permissions: \{\}$/m);
+    expect(workflow).toMatch(
+      /recover-release:[\s\S]*?permissions:\n\s+actions: read\n\s+contents: write/,
+    );
+    expect(workflow).toContain('environment: production');
+    expect(workflow).toContain('[[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]');
+    expect(workflow).toContain('git verify-tag --raw "$RELEASE_TAG"');
+    expect(workflow).toContain('git rev-parse "$PERSONAL_TAG^{tree}"');
+    expect(workflow).toContain('test "$(jq -r \'.event\' <<<"$RUN_JSON")" = push');
+    expect(workflow).toContain('test "$(jq -r \'.head_branch\' <<<"$RUN_JSON")"');
+    expect(workflow).toContain('test "$PREFLIGHT_CONCLUSION" = success');
+    expect(workflow).toContain(
+      'actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131',
+    );
+    expect(workflow).toContain('run-id: ${{ inputs.source_run_id }}');
+    expect(workflow).toContain('sha256sum --check SHA256SUMS');
+    expect(workflow).toContain('gh release create "$RELEASE_TAG"');
+    expect(workflow).toContain('gh release verify-asset "$RELEASE_TAG"');
+    expect(workflow).not.toContain('npm publish');
+    expect(workflow).not.toContain('docker build');
+    expect(workflow).not.toContain('publish-smithery');
+  });
 });
