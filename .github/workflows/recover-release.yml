@@ -31,7 +31,6 @@ jobs:
     env:
       RELEASE_TAG: ${{ inputs.tag }}
       SOURCE_RUN_ID: ${{ inputs.source_run_id }}
-      ARTIFACT_DIR: ${{ runner.temp }}/release-artifacts
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       SBOM_FILE: mcp-server-efi-image.spdx.json
     steps:
@@ -136,11 +135,11 @@ jobs:
         run: |
           set -euo pipefail
           gh release create "$RELEASE_TAG" \
-            "$ARTIFACT_DIR/$PACKAGE_FILE" \
-            "$ARTIFACT_DIR/$MCPB_FILE" \
-            "$ARTIFACT_DIR/$SERVER_CARD_FILE" \
-            "$ARTIFACT_DIR/$SBOM_FILE" \
-            "$ARTIFACT_DIR/SHA256SUMS" \
+            "$RUNNER_TEMP/release-artifacts/$PACKAGE_FILE" \
+            "$RUNNER_TEMP/release-artifacts/$MCPB_FILE" \
+            "$RUNNER_TEMP/release-artifacts/$SERVER_CARD_FILE" \
+            "$RUNNER_TEMP/release-artifacts/$SBOM_FILE" \
+            "$RUNNER_TEMP/release-artifacts/SHA256SUMS" \
             --verify-tag \
             --title "mcp-server-efi $VERSION" \
             --notes-file CHANGELOG.md
@@ -156,5 +155,5 @@ jobs:
             "$SBOM_FILE" \
             SHA256SUMS
           do
-            gh release verify-asset "$RELEASE_TAG" "$ARTIFACT_DIR/$FILE"
+            gh release verify-asset "$RELEASE_TAG" "$RUNNER_TEMP/release-artifacts/$FILE"
           done

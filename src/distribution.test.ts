@@ -311,6 +311,8 @@ describe('distribuição', () => {
     );
     expect(workflow).toContain('run-id: ${{ inputs.source_run_id }}');
     expect(workflow).toContain('sha256sum --check SHA256SUMS');
+    expect(workflow).not.toContain('ARTIFACT_DIR: ${{ runner.temp }}');
+    expect(workflow).toContain('$RUNNER_TEMP/release-artifacts/$PACKAGE_FILE');
     expect(workflow).toContain('gh release create "$RELEASE_TAG"');
     expect(workflow).toContain('gh release verify-asset "$RELEASE_TAG"');
     expect(workflow).not.toContain('npm publish');
