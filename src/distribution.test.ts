@@ -299,7 +299,8 @@ describe('distribuição', () => {
     expect(workflow).toMatch(
       /recover-release:[\s\S]*?permissions:\n\s+actions: read\n\s+contents: write/,
     );
-    expect(workflow).toContain('environment: production');
+    expect(workflow).not.toContain('environment: production');
+    expect(workflow).toContain('test "$RELEASE_CONFIRMATION" = RECOVER_RELEASE');
     expect(workflow).toContain('[[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]');
     expect(workflow).toContain('git verify-tag --raw "$RELEASE_TAG"');
     expect(workflow).toContain('git rev-parse "$PERSONAL_TAG^{tree}"');

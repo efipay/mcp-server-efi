@@ -11,6 +11,10 @@ on:
         description: ID da execução de Release que produziu release-artifacts
         required: true
         type: string
+      confirmation:
+        description: Digite RECOVER_RELEASE para confirmar a publicação
+        required: true
+        type: string
 
 permissions: {}
 
@@ -25,12 +29,12 @@ jobs:
     permissions:
       actions: read
       contents: write
-    environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       RELEASE_TAG: ${{ inputs.tag }}
       SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       SBOM_FILE: mcp-server-efi-image.spdx.json
     steps:
@@ -40,6 +44,7 @@ jobs:
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
           [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          test "$RELEASE_CONFIRMATION" = RECOVER_RELEASE
 
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
