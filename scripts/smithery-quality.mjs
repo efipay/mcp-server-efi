@@ -1,4 +1,10 @@
 const EXPECTED_TOOL_COUNT = 173;
+const SMITHERY_OMITTED_ROOT_SCHEMA_FIELDS = new Set([
+  '$schema',
+  'additionalProperties',
+  'description',
+  'required',
+]);
 
 function isObject(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -15,6 +21,56 @@ function canonicalJson(value) {
     Object.entries(value)
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([key, entry]) => [key, canonicalJson(entry)]),
+  );
+}
+
+function withoutSmitheryOmittedRootFields(schema) {
+  return Object.fromEntries(
+    Object.entries(schema).filter(([key]) => !SMITHERY_OMITTED_ROOT_SCHEMA_FIELDS.has(key)),
+  );
+}
+
+function assertPublishedSchemaMatches(published, expected, label, toolName) {
+  for (const field of SMITHERY_OMITTED_ROOT_SCHEMA_FIELDS) {
+    if (!(field in published)) continue;
+    assert(
+      JSON.stringify(canonicalJson(published[field])) ===
+        JSON.stringify(canonicalJson(expected[field])),
+      `${label} divergente: ${toolName}.`,
+    );
+  }
+
+  assert(
+    JSON.stringify(canonicalJson(withoutSmitheryOmittedRootFields(published))) ===
+      JSON.stringify(canonicalJson(withoutSmitheryOmittedRootFields(expected))),
+    `${label} divergente: ${toolName}.`,
+  );
+}
+
+function assertPublishedConfigSchemaMatches(published, expected) {
+  assert(isObject(published?.properties), 'O schema de configuração publicado não possui campos.');
+  const expectedProperties = Object.keys(expected.properties ?? {});
+  const normalizedProperties = Object.fromEntries(
+    Object.entries(published.properties).map(([name, property]) => {
+      assert(isObject(property), `Configuração publicada inválida: ${name}.`);
+      const expectedOrder = expectedProperties.indexOf(name);
+      assert(expectedOrder >= 0, `Configuração publicada inesperada: ${name}.`);
+      if ('x-order' in property) {
+        assert(
+          property['x-order'] === expectedOrder,
+          `Ordem publicada divergente para a configuração ${name}.`,
+        );
+      }
+      const contract = { ...property };
+      delete contract['x-order'];
+      return [name, contract];
+    }),
+  );
+  const normalized = { ...published, properties: normalizedProperties };
+
+  assert(
+    JSON.stringify(canonicalJson(normalized)) === JSON.stringify(canonicalJson(expected)),
+    'O schema de configuração publicado diverge do artefato.',
   );
 }
 
@@ -150,21 +206,27 @@ export function validatePublishedServer(server, card, configSchema, expectedMeta
     );
     assert(isObject(published.inputSchema), `Input schema ausente: ${expected.name}.`);
     assert(isObject(published.outputSchema), `Output schema ausente: ${expected.name}.`);
-    assert(
-      JSON.stringify(canonicalJson(published.inputSchema)) ===
-        JSON.stringify(canonicalJson(expected.inputSchema)),
-      `Input schema divergente: ${expected.name}.`,
+    // O GET público do Smithery omite estes metadados somente na raiz dos schemas.
+    // Quando algum deles for devolvido, seu valor ainda deverá ser exatamente o enviado.
+    assertPublishedSchemaMatches(
+      published.inputSchema,
+      expected.inputSchema,
+      'Input schema',
+      expected.name,
     );
-    assert(
-      JSON.stringify(canonicalJson(published.outputSchema)) ===
-        JSON.stringify(canonicalJson(expected.outputSchema)),
-      `Output schema divergente: ${expected.name}.`,
+    assertPublishedSchemaMatches(
+      published.outputSchema,
+      expected.outputSchema,
+      'Output schema',
+      expected.name,
     );
     for (const [purpose, schema] of [
       ['inputSchema', published.inputSchema],
       ['outputSchema', published.outputSchema],
     ]) {
-      visitSchema(schema, `${expected.name}.${purpose}`, (node, path) => {
+      const rootPath = `${expected.name}.${purpose}`;
+      visitSchema(schema, rootPath, (node, path) => {
+        if (path === rootPath) return;
         assert(
           typeof node.description === 'string' && node.description.trim().length > 0,
           `Nó de schema publicado sem descrição: ${path}.`,
@@ -175,11 +237,7 @@ export function validatePublishedServer(server, card, configSchema, expectedMeta
 
   const stdioConnection = server.connections?.find((connection) => connection.type === 'stdio');
   assert(stdioConnection, 'O cadastro não retornou uma conexão stdio.');
-  assert(
-    JSON.stringify(canonicalJson(stdioConnection.configSchema)) ===
-      JSON.stringify(canonicalJson(configSchema)),
-    'O schema de configuração publicado diverge do artefato.',
-  );
+  assertPublishedConfigSchemaMatches(stdioConnection.configSchema, configSchema);
 }
 
 export const SMITHERY_EXPECTED_TOOL_COUNT = EXPECTED_TOOL_COUNT;

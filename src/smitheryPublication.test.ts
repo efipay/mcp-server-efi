@@ -85,11 +85,23 @@ function smitheryFetch(
 ) {
   const requests: Array<{ url: string; init?: RequestInit }> = [];
   const schema = configurationSchema();
+  const publishedConfigSchema = structuredClone(schema);
+  Object.values(publishedConfigSchema.properties).forEach((property, index) => {
+    property['x-order'] = index;
+  });
+  const smitherySchema = (source: Record<string, unknown>) => {
+    const normalized = structuredClone(source);
+    delete normalized.$schema;
+    delete normalized.additionalProperties;
+    delete normalized.description;
+    delete normalized.required;
+    return normalized;
+  };
   const tools = card.tools.map(({ name, description, inputSchema, outputSchema }) => ({
     name,
     description,
-    inputSchema,
-    outputSchema,
+    inputSchema: smitherySchema(inputSchema),
+    outputSchema: smitherySchema(outputSchema),
   }));
   if (alterPublishedSchema) {
     tools[0] = { ...tools[0], outputSchema: { type: 'object', properties: {} } };
@@ -106,7 +118,7 @@ function smitheryFetch(
       {
         type: 'stdio',
         bundleUrl: 'https://example.test/server.mcpb',
-        configSchema: schema,
+        configSchema: publishedConfigSchema,
       },
     ],
   };
@@ -174,7 +186,7 @@ describe('Server Card e publicação Smithery', () => {
     expect(JSON.stringify(card)).not.toMatch(/contexto\/|EFI_CLIENT_SECRET/);
   });
 
-  it('publica bundle e card, sincroniza metadados e executa o pós-check', async () => {
+  it('publica bundle e card e aceita somente a normalização de raiz feita pelo Smithery', async () => {
     const { fetchImpl, requests } = smitheryFetch('SUCCESS');
     const result = await publishSmithery(publishOptions(fetchImpl));
     expect(result).toMatchObject({ deploymentId: 'deployment-1', toolCount: 173 });
