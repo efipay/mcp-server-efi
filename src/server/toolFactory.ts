@@ -17,6 +17,7 @@ import {
   SENSITIVE_TOOL_NAMES,
   TOOL_CATALOG,
 } from '../catalog/index.js';
+import { describePublicSchema } from '../catalog/schemaDescriptions.js';
 import { MAX_SANITIZED_ERROR_LENGTH, sanitizeError } from './errorSanitizer.js';
 import { inspectPixQrCode, type PixQrCodeVerification } from './pixQrCodeVerification.js';
 import { ToolRequestGuard } from './requestGuard.js';
@@ -126,12 +127,19 @@ function pdfResult(definition: ToolDefinition, input: ToolInput, result: unknown
 
   const identity = receiptIdentity(input);
   const uri = `efi://pix/comprovantes/${identity.type}/${encodeURIComponent(identity.id)}.pdf`;
+  const structuredContent = {
+    result: {
+      uri,
+      mimeType: 'application/pdf' as const,
+      identifier: identity,
+    },
+  };
 
   return {
     content: [
       {
         type: 'text',
-        text: `Comprovante Pix (${identity.type}: ${identity.id}) obtido em PDF.`,
+        text: stringify(structuredContent),
       },
       {
         type: 'resource',
@@ -142,6 +150,7 @@ function pdfResult(definition: ToolDefinition, input: ToolInput, result: unknown
         },
       },
     ],
+    structuredContent,
   };
 }
 
@@ -231,6 +240,8 @@ async function successResult(
 const IDEMPOTENCY_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 const sensitiveToolNames = new Set<string>(SENSITIVE_TOOL_NAMES);
 
+export type EfiPayClientProvider = (definition: ToolDefinition) => EfiPay;
+
 export function generateIdempotencyKey(): string {
   return Array.from(
     { length: 72 },
@@ -239,6 +250,7 @@ export function generateIdempotencyKey(): string {
 }
 
 export interface ToolHandlerOptions {
+  allowedSensitiveTools?: ReadonlySet<string>;
   requestGuard?: ToolRequestGuard;
   secretValues?: readonly string[];
   fetch?: typeof fetch;
@@ -246,15 +258,22 @@ export interface ToolHandlerOptions {
 
 export function createToolHandler(
   definition: ToolDefinition,
-  client: EfiPay,
+  clientProvider: EfiPay | EfiPayClientProvider,
   options: ToolHandlerOptions = {},
 ) {
   return async (input: ToolInput): Promise<CallToolResult> => {
     if (
-      definition.method !== 'pixQrCodeDetail' &&
-      typeof client[definition.method] !== 'function'
+      sensitiveToolNames.has(definition.name) &&
+      !options.allowedSensitiveTools?.has(definition.name)
     ) {
-      throw new InternalToolError(`O SDK não expõe o método ${definition.method}.`);
+      return apiErrorResult(
+        new Error(
+          `A execução de ${definition.name} está bloqueada porque sua resposta contém material ` +
+            'sensível. Configure EFI_SENSITIVE_TOOLS e ' +
+            'EFI_ACCEPT_SENSITIVE_OUTPUT_RISK=I_UNDERSTAND para autorizar explicitamente.',
+        ),
+        options.secretValues ?? [],
+      );
     }
 
     const decision = options.requestGuard?.acquire(
@@ -290,6 +309,11 @@ export function createToolHandler(
         );
       }
 
+      const client =
+        typeof clientProvider === 'function' ? clientProvider(definition) : clientProvider;
+      if (typeof client[definition.method] !== 'function') {
+        throw new InternalToolError(`O SDK não expõe o método ${definition.method}.`);
+      }
       const result = await definition.invoke(
         client,
         { params: input.params, body: input.body },
@@ -371,18 +395,30 @@ function installStrictToolCallHandler(
   });
 }
 
-function protocolObjectSchema(schema: ReturnType<typeof inputSchemaFor>): Tool['inputSchema'];
+function protocolObjectSchema(
+  schema: ReturnType<typeof inputSchemaFor>,
+  definition: ToolDefinition,
+  purpose: 'entrada',
+): Tool['inputSchema'];
 function protocolObjectSchema(
   schema: NonNullable<ReturnType<typeof outputSchemaFor>>,
+  definition: ToolDefinition,
+  purpose: 'saída',
 ): NonNullable<Tool['outputSchema']>;
 function protocolObjectSchema(
   schema: ReturnType<typeof inputSchemaFor> | NonNullable<ReturnType<typeof outputSchemaFor>>,
+  definition: ToolDefinition,
+  purpose: 'entrada' | 'saída',
 ): Tool['inputSchema'] {
   const jsonSchema = z.toJSONSchema(schema, { target: 'draft-7' });
   if (jsonSchema.type !== 'object') {
     throw new InternalToolError('Schemas MCP de entrada e saída devem possuir raiz object.');
   }
-  return jsonSchema as Tool['inputSchema'];
+  return describePublicSchema(
+    jsonSchema as Record<string, unknown>,
+    definition,
+    purpose,
+  ) as Tool['inputSchema'];
 }
 
 function publicToolDefinition(
@@ -394,8 +430,10 @@ function publicToolDefinition(
     name: definition.name,
     title: definition.title,
     description: definition.description,
-    inputSchema: protocolObjectSchema(inputSchema),
-    ...(outputSchema ? { outputSchema: protocolObjectSchema(outputSchema) } : {}),
+    inputSchema: protocolObjectSchema(inputSchema, definition, 'entrada'),
+    ...(outputSchema
+      ? { outputSchema: protocolObjectSchema(outputSchema, definition, 'saída') }
+      : {}),
     annotations: definition.annotations,
   };
 }
@@ -414,23 +452,20 @@ function installPublicToolListHandler(
 
 export function registerCatalogTools(
   server: McpServer,
-  client: EfiPay,
+  clientProvider: EfiPayClientProvider,
   enabledApis: ReadonlySet<ApiGroup>,
   options: RegisterCatalogToolsOptions = {},
 ): number {
   const registeredTools = new Map<string, RegisteredToolRuntime>();
-  const enabledSensitiveTools = options.enabledSensitiveTools ?? new Set<string>();
   const requestGuard = options.requestGuard;
 
   for (const definition of TOOL_CATALOG) {
     if (!enabledApis.has(definition.api)) continue;
-    if (sensitiveToolNames.has(definition.name) && !enabledSensitiveTools.has(definition.name)) {
-      continue;
-    }
 
     const inputSchema = inputSchemaFor(definition);
     const outputSchema = outputSchemaFor(definition);
-    const handler = createToolHandler(definition, client, {
+    const handler = createToolHandler(definition, clientProvider, {
+      allowedSensitiveTools: options.allowedSensitiveTools,
       requestGuard,
       secretValues: options.secretValues,
       fetch: options.fetch,
@@ -461,7 +496,7 @@ export function registerCatalogTools(
 }
 
 export interface RegisterCatalogToolsOptions {
-  enabledSensitiveTools?: ReadonlySet<string>;
+  allowedSensitiveTools?: ReadonlySet<string>;
   requestGuard?: ToolRequestGuard;
   secretValues?: readonly string[];
   fetch?: typeof fetch;

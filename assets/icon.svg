@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 460" role="img" aria-labelledby="title">
+  <title>Efí Pay</title>
+  <rect width="460" height="460" fill="#292a33"/>
+  <g fill="#ff6b18">
+    <text x="104" y="274" font-family="Arial, Helvetica, sans-serif" font-size="181" font-weight="500" letter-spacing="-12">efi</text>
+    <path d="M315 151c-7 5-6 15 3 17l36-10v-31z"/>
+    <text x="257" y="320" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="500">PAY</text>
+  </g>
+</svg>

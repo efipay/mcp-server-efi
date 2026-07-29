@@ -16,10 +16,15 @@ export class ConfigurationError extends Error {
   }
 }
 
+export type RuntimeSdkOptions = Omit<SdkOptions, 'client_id' | 'client_secret'> & {
+  client_id?: string;
+  client_secret?: string;
+};
+
 export interface RuntimeConfig {
-  sdk: SdkOptions;
+  sdk: RuntimeSdkOptions;
   enabledApis: ReadonlySet<ApiGroup>;
-  enabledSensitiveTools: ReadonlySet<SensitiveToolName>;
+  allowedSensitiveTools: ReadonlySet<SensitiveToolName>;
   limits: ServerLimits;
 }
 
@@ -34,19 +39,20 @@ const cliOptions = {
 
 type CliValues = Partial<Record<keyof typeof cliOptions, string | boolean>>;
 
-function first(...values: Array<string | boolean | undefined>): string | boolean | undefined {
-  return values.find((value) => value !== undefined && value !== '');
+function isUnresolvedUserConfig(value: unknown): boolean {
+  return typeof value === 'string' && /^\$\{user_config\.[^}]+\}$/.test(value.trim());
 }
 
-function requiredString(value: unknown, label: string): string {
-  if (typeof value !== 'string' || value.trim() === '') {
-    throw new ConfigurationError(`${label} é obrigatório.`);
-  }
-  return value;
+function first(...values: Array<string | boolean | undefined>): string | boolean | undefined {
+  return values.find(
+    (value) => value !== undefined && value !== '' && !isUnresolvedUserConfig(value),
+  );
 }
 
 function optionalString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() !== '' ? value : undefined;
+  return typeof value === 'string' && value.trim() !== '' && !isUnresolvedUserConfig(value)
+    ? value
+    : undefined;
 }
 
 function booleanValue(value: unknown, label: string, defaultValue?: boolean): boolean {
@@ -157,26 +163,21 @@ export function loadRuntimeConfig(
   if (cli.help === true) throw new ConfigurationError('HELP');
 
   const enabledApis = apiSelection(first(cli.apis, processEnv.EFI_APIS, processEnv.APIS));
-  const enabledSensitiveTools = sensitiveToolSelection(
+  const allowedSensitiveTools = sensitiveToolSelection(
     processEnv.EFI_SENSITIVE_TOOLS,
     processEnv.EFI_ACCEPT_SENSITIVE_OUTPUT_RISK,
     enabledApis,
   );
   const certificate = optionalString(processEnv.EFI_CERTIFICATE);
-  const requiresCertificate = [...enabledApis].some((api) => api !== 'cobrancas');
-  if (requiresCertificate && !certificate) {
-    throw new ConfigurationError(
-      'EFI_CERTIFICATE é obrigatório quando alguma API com autenticação mTLS está habilitada.',
-    );
-  }
 
-  const sdk: SdkOptions = {
+  const sdk: RuntimeSdkOptions = {
     sandbox: booleanValue(
       first(cli.sandbox, processEnv.EFI_SANDBOX, processEnv.SANDBOX),
       'sandbox',
+      true,
     ),
-    client_id: requiredString(processEnv.EFI_CLIENT_ID, 'EFI_CLIENT_ID'),
-    client_secret: requiredString(processEnv.EFI_CLIENT_SECRET, 'EFI_CLIENT_SECRET'),
+    client_id: optionalString(processEnv.EFI_CLIENT_ID),
+    client_secret: optionalString(processEnv.EFI_CLIENT_SECRET),
     certificate,
     pemKey: optionalString(processEnv.EFI_PEM_KEY),
     cert_base64: booleanValue(
@@ -221,16 +222,16 @@ export function loadRuntimeConfig(
     ),
   };
 
-  return { sdk, enabledApis, enabledSensitiveTools, limits };
+  return { sdk, enabledApis, allowedSensitiveTools, limits };
 }
 
 export function helpText(): string {
-  return `mcp-server-efi 1.0.0
+  return `mcp-server-efi 1.0.1
 
 Uso: mcp-server-efi [opções]
 
 Opções:
-  --sandbox=<true|false>       Ambiente de homologação ou produção (obrigatório)
+  --sandbox=<true|false>       Ambiente de homologação ou produção (padrão: true)
   --apis=<lista>               cobrancas,pix,open-finance,pagamento-contas,abertura-contas,extratos
   --cert-base64=<true|false>   Certificado e PEM estão em base64 (padrão: true)
   --validate-mtls=<booleano>   Proteção mTLS dos webhooks (padrão/recomendado: true)
@@ -238,9 +239,9 @@ Opções:
   -h, --help                   Exibe esta ajuda
 
 Credenciais (somente via ambiente):
-  EFI_CLIENT_ID                Client ID da aplicação Efí
-  EFI_CLIENT_SECRET            Client secret da aplicação Efí
-  EFI_CERTIFICATE              Certificado para APIs mTLS
+  EFI_CLIENT_ID                Client ID, exigido ao chamar endpoints HTTP
+  EFI_CLIENT_SECRET            Client secret, exigido ao chamar endpoints HTTP
+  EFI_CERTIFICATE              Certificado, exigido ao chamar APIs mTLS
   EFI_PEM_KEY                  Chave privada do certificado PEM
   EFI_PARTNER_TOKEN            Token de parceiro, quando aplicável
 

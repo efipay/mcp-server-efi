@@ -2,9 +2,10 @@
   "manifest_version": "0.3",
   "name": "mcp-server-efi",
   "display_name": "Servidor MCP Efí",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "icon": "icon.svg",
   "description": "Acesso tipado às APIs da Efí por meio do Model Context Protocol.",
-  "long_description": "Servidor local stdio com cobertura integral do SDK Node Efí 2.0.0. Expõe Cobranças, Pix, Open Finance, Pagamento de Contas, Abertura de Contas e Extratos, com contratos Zod oficiais e respostas sensíveis ocultas por padrão.",
+  "long_description": "Servidor local stdio com cobertura integral do SDK Node Efí 2.0.0. Expõe Cobranças, Pix, Open Finance, Pagamento de Contas, Abertura de Contas e Extratos, com contratos Zod oficiais e execução protegida para respostas sensíveis.",
   "author": {
     "name": "João Lucas Alberto Muniz"
   },
@@ -51,28 +52,28 @@
     "client_id": {
       "type": "string",
       "title": "Client ID Efí",
-      "description": "Client ID da aplicação Efí.",
+      "description": "Client ID da aplicação Efí. Pode ser informado depois da instalação, mas é exigido nas chamadas HTTP.",
       "sensitive": true,
-      "required": true
+      "required": false
     },
     "client_secret": {
       "type": "string",
       "title": "Client Secret Efí",
-      "description": "Client Secret da aplicação Efí.",
+      "description": "Client Secret da aplicação Efí. Pode ser informado depois da instalação, mas é exigido nas chamadas HTTP.",
       "sensitive": true,
-      "required": true
+      "required": false
     },
     "sandbox": {
       "type": "boolean",
       "title": "Ambiente de homologação",
       "description": "Ative para usar o sandbox Efí.",
       "default": true,
-      "required": true
+      "required": false
     },
     "certificate": {
       "type": "string",
       "title": "Certificado mTLS",
-      "description": "Conteúdo base64 ou caminho absoluto do certificado. Pode ser omitido apenas com a API cobrancas isolada.",
+      "description": "Conteúdo base64 ou caminho absoluto do certificado. É exigido somente ao executar uma chamada de API mTLS.",
       "sensitive": true,
       "required": false
     },
@@ -114,8 +115,8 @@
     "apis": {
       "type": "string",
       "title": "APIs habilitadas",
-      "description": "Lista separada por vírgulas. O pacote MCPB inicia somente Cobranças por padrão; amplie a lista para habilitar outros domínios.",
-      "default": "cobrancas",
+      "description": "Lista separada por vírgulas usada para filtrar os domínios expostos. Por padrão, todas as APIs ficam disponíveis.",
+      "default": "cobrancas,pix,open-finance,pagamento-contas,abertura-contas,extratos",
       "required": false
     },
     "sensitive_tools": {

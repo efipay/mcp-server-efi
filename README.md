@@ -10,7 +10,9 @@ e a origem dos pacotes publicados pela Efí.
 
 ## Cobertura
 
-O catálogo cobre 173 métodos. Por segurança, 170 tools são registradas por padrão; três operações que devolvem certificado, credenciais ou chave privada exigem opt-in explícito.
+O catálogo cobre e registra por padrão os 173 métodos. As três operações que
+devolvem certificado, credenciais ou chave privada aparecem na descoberta, mas
+sua execução exige opt-in explícito.
 
 | API                 | Endpoints HTTP | Operações locais |
 | ------------------- | -------------: | ---------------: |
@@ -26,12 +28,17 @@ Os nomes das tools usam `snake_case`. A entrada mantém o envelope `{ params, bo
 ## Requisitos
 
 - Node.js 22 ou superior.
-- Client ID e Client Secret de uma aplicação Efí.
-- Certificado para APIs mTLS. Somente uma seleção formada exclusivamente por `cobrancas` dispensa certificado.
+- Client ID e Client Secret de uma aplicação Efí para executar endpoints HTTP.
+- Certificado ao executar APIs mTLS.
+
+O servidor pode iniciar, completar o handshake e apresentar seu catálogo sem
+credenciais. A configuração necessária é verificada somente quando uma tool
+realiza uma operação HTTP; chamadas locais de inspeção e geração de QR Code Pix
+continuam disponíveis.
 
 ## Credenciais e execução pela CLI
 
-Credenciais não são aceitas em argumentos da linha de comando, pois argumentos
+Credenciais são opcionais no startup e não são aceitas em argumentos da linha de comando, pois argumentos
 podem aparecer no histórico do shell e na lista de processos. Crie um arquivo
 local `.env.efi`, mantenha-o fora do controle de versão e restrinja sua leitura:
 
@@ -62,14 +69,14 @@ Sem `--apis`, os seis domínios são habilitados. Os valores aceitos são `cobra
 
 Somente opções não secretas possuem flags. Sua precedência é `CLI > EFI_* > variável legada`:
 
-| CLI               | Ambiente `EFI_*`    | Legada          | Padrão      |
-| ----------------- | ------------------- | --------------- | ----------- |
-| `--sandbox`       | `EFI_SANDBOX`       | `SANDBOX`       | obrigatório |
-| `--apis`          | `EFI_APIS`          | `APIS`          | todas       |
-| `--cert-base64`   | `EFI_CERT_BASE64`   | `CERT_BASE64`   | `true`      |
-| `--validate-mtls` | `EFI_VALIDATE_MTLS` | `VALIDATE_MTLS` | `true`      |
-| `--cache`         | `EFI_CACHE`         | `CACHE`         | `true`      |
-| `-h`, `--help`    | —                   | —               | —           |
+| CLI               | Ambiente `EFI_*`    | Legada          | Padrão |
+| ----------------- | ------------------- | --------------- | ------ |
+| `--sandbox`       | `EFI_SANDBOX`       | `SANDBOX`       | `true` |
+| `--apis`          | `EFI_APIS`          | `APIS`          | todas  |
+| `--cert-base64`   | `EFI_CERT_BASE64`   | `CERT_BASE64`   | `true` |
+| `--validate-mtls` | `EFI_VALIDATE_MTLS` | `VALIDATE_MTLS` | `true` |
+| `--cache`         | `EFI_CACHE`         | `CACHE`         | `true` |
+| `-h`, `--help`    | —                   | —               | —      |
 
 Booleanos aceitam `true`, `false`, `1` e `0`.
 
@@ -80,25 +87,25 @@ configuração do webhook. Por segurança, não recomendamos desabilitá-la.
 
 Material de autenticação e valores sensíveis são aceitos exclusivamente pelas seguintes variáveis, sem flags ou aliases sem o prefixo `EFI_`:
 
-| Variável            | Destino no SDK  | Obrigatoriedade                      |
-| ------------------- | --------------- | ------------------------------------ |
-| `EFI_CLIENT_ID`     | `client_id`     | sempre                               |
-| `EFI_CLIENT_SECRET` | `client_secret` | sempre                               |
-| `EFI_CERTIFICATE`   | `certificate`   | quando alguma API mTLS estiver ativa |
-| `EFI_PEM_KEY`       | `pemKey`        | certificado PEM com chave separada   |
-| `EFI_PARTNER_TOKEN` | `partner_token` | somente integrações compatíveis      |
+| Variável            | Destino no SDK  | Obrigatoriedade                    |
+| ------------------- | --------------- | ---------------------------------- |
+| `EFI_CLIENT_ID`     | `client_id`     | em chamadas HTTP                   |
+| `EFI_CLIENT_SECRET` | `client_secret` | em chamadas HTTP                   |
+| `EFI_CERTIFICATE`   | `certificate`   | na chamada de uma API mTLS         |
+| `EFI_PEM_KEY`       | `pemKey`        | certificado PEM com chave separada |
+| `EFI_PARTNER_TOKEN` | `partner_token` | somente integrações compatíveis    |
 
 Não existe chave global de idempotência: cada uma das 17 mutações Open Finance recebe a chave explícita da chamada ou uma nova chave alfanumérica de 72 caracteres. Valores vazios e CR/LF são rejeitados.
 
 ### Saídas sensíveis
 
-Estas tools não aparecem em `tools/list` por padrão:
+Estas tools aparecem em `tools/list`, mas sua execução é bloqueada por padrão:
 
 - `create_account_certificate`
 - `get_account_credentials`
 - `create_sftp_key`
 
-Para habilitar somente as necessárias, configure simultaneamente:
+Para autorizar somente as necessárias, configure simultaneamente:
 
 ```dotenv
 EFI_SENSITIVE_TOOLS=create_account_certificate,get_account_credentials
@@ -156,13 +163,13 @@ runtime contém o executável `node` e as dependências de produção, mas não 
 gerenciador de pacotes.
 
 ```bash
-docker pull ghcr.io/efipay/mcp-server-efi:1.0.0
+docker pull ghcr.io/efipay/mcp-server-efi:1.0.1
 
 docker run -i --rm \
   --env-file .env.efi \
   --mount type=bind,source=/caminho/absoluto/certificado.p12,target=/run/secrets/efi.p12,readonly \
   --env EFI_CERTIFICATE=/run/secrets/efi.p12 \
-  ghcr.io/efipay/mcp-server-efi:1.0.0 \
+  ghcr.io/efipay/mcp-server-efi:1.0.1 \
   --apis=pix,open-finance
 ```
 
@@ -172,23 +179,24 @@ no arquivo de ambiente e use `EFI_CERT_BASE64=true`, sem mount.
 
 ## Instalação via Smithery e MCPB
 
-Na instalação pelo Smithery, o servidor é fornecido como MCP Bundle e executado
-localmente via `stdio`, sem uma URL pública. O [manifesto MCPB 0.3](manifest.json)
+Na [página oficial do servidor no Smithery](https://smithery.ai/servers/efipay/mcp-server-efi),
+o servidor é fornecido como MCP Bundle e executado localmente via `stdio`, sem
+uma URL pública. O [manifesto MCPB 0.3](manifest.json)
 marca credenciais e certificados como configurações sensíveis e os encaminha ao
 processo por `EFI_*`, nunca por `args`.
 
-O instalador MCPB seleciona somente `cobrancas` por padrão. Por isso ele pode iniciar
-sem certificado mTLS; ao acrescentar Pix, Open Finance, Pagamento de Contas, Abertura
-de Contas ou Extratos, o certificado volta a ser obrigatório. Esse padrão é
-deliberadamente diferente da CLI: sem `--apis` ou `EFI_APIS`, a CLI habilita os seis
-domínios.
+O MCPB aceita configuração vazia e apresenta as 173 tools dos seis domínios.
+Credenciais e certificado podem ser adicionados pela interface segura do cliente
+antes de executar os endpoints correspondentes.
 
 ## Contratos e respostas MCP
 
 - `params`, `body` e respostas usam os schemas Zod 4 exportados pelo SDK oficial.
 - Respostas JSON são fornecidas como texto e em `structuredContent.result`.
 - Operações sem conteúdo retornam `{ "success": true }`.
-- Comprovantes Pix são expostos como recursos PDF; QR Codes podem incluir conteúdo de imagem.
+- Comprovantes Pix retornam a URI e o identificador em `structuredContent.result`
+  e mantêm o conteúdo binário somente no recurso PDF embutido; QR Codes podem
+  incluir conteúdo de imagem.
 - `pix_qr_code_detail` preserva o JWS obtido pelo mesmo decoder usado no SDK, exige que `jku` tenha a mesma origem do payload acessado e verifica a assinatura com o `kid` do JWKS. Estados `invalid` e `unavailable` são alertas e não autorizam pagamento.
 - Falhas de validação ou da Efí retornam `isError: true`, com dados sensíveis sanitizados.
 - `stdout` é reservado ao protocolo; mensagens operacionais são escritas em `stderr`.

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
+import { validateServerCard } from './smithery-quality.mjs';
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -18,6 +19,8 @@ function run(command, args, options = {}) {
 const workspace = process.cwd();
 const manifest = JSON.parse(readFileSync(join(workspace, 'manifest.json'), 'utf8'));
 const output = resolve(workspace, process.argv[2] ?? `mcp-server-efi-${manifest.version}.mcpb`);
+const cardPath = resolve(workspace, `smithery-server-card-${manifest.version}.json`);
+const card = validateServerCard(JSON.parse(readFileSync(cardPath, 'utf8')), manifest.version);
 const temporary = mkdtempSync(join(tmpdir(), 'mcp-server-efi-mcpb-'));
 const staging = join(temporary, 'bundle');
 
@@ -33,6 +36,12 @@ try {
   ]) {
     cpSync(join(workspace, path), join(staging, path), { recursive: true });
   }
+  cpSync(join(workspace, 'assets', 'icon.svg'), join(staging, 'icon.svg'));
+
+  const stagedManifestPath = join(staging, 'manifest.json');
+  const stagedManifest = JSON.parse(readFileSync(stagedManifestPath, 'utf8'));
+  stagedManifest.tools = card.tools.map(({ name, description }) => ({ name, description }));
+  writeFileSync(stagedManifestPath, `${JSON.stringify(stagedManifest, undefined, 2)}\n`);
 
   run('npm', ['ci', '--omit=dev', '--ignore-scripts', '--no-fund'], {
     cwd: staging,
@@ -45,11 +54,13 @@ try {
   });
   rmSync(join(staging, 'package-lock.json'));
 
-  const packagedManifest = JSON.parse(readFileSync(join(staging, 'manifest.json'), 'utf8'));
+  const packagedManifest = JSON.parse(readFileSync(stagedManifestPath, 'utf8'));
   if (
     packagedManifest.manifest_version !== '0.3' ||
     packagedManifest.version !== manifest.version ||
-    packagedManifest.server?.entry_point !== 'dist/src/index.js'
+    packagedManifest.server?.entry_point !== 'dist/src/index.js' ||
+    packagedManifest.icon !== 'icon.svg' ||
+    packagedManifest.tools?.length !== 173
   ) {
     throw new Error(`O manifest MCPB não corresponde ao runtime ${manifest.version}.`);
   }

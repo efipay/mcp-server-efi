@@ -24,6 +24,7 @@ function deriveReleaseMetadata(manifest, tag) {
     version: manifest.version,
     package_file: `${EXPECTED_PACKAGE_NAME}-${manifest.version}.tgz`,
     mcpb_file: `${EXPECTED_PACKAGE_NAME}-${manifest.version}.mcpb`,
+    server_card_file: `smithery-server-card-${manifest.version}.json`,
   };
 }
 
@@ -53,5 +54,6 @@ appendVariables(argumentValue('--github-env'), {
   VERSION: metadata.version,
   PACKAGE_FILE: metadata.package_file,
   MCPB_FILE: metadata.mcpb_file,
+  SERVER_CARD_FILE: metadata.server_card_file,
 });
 process.stdout.write(`${JSON.stringify(metadata)}\n`);

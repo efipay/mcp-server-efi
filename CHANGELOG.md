@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1 — 2026-07-29
+
+- Inicialização e descoberta das 173 tools sem exigir credenciais.
+- Validação de autenticação e certificado sob demanda, antes de qualquer chamada HTTP.
+- Server Card completo, parâmetros descritos e output estruturado para comprovantes PDF.
+- Configuração MCPB opcional, metadados públicos e ícone Efí sincronizados no Smithery.
+- Publicador Smithery controlado e pós-validação semântica dos contratos publicados.
+
 ## 1.0.0 — 2026-07-27
 
 - Cobertura dos 173 métodos públicos de `sdk-node-apis-efi@2.0.0`, com contratos Zod oficiais.

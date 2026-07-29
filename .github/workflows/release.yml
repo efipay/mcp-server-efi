@@ -29,6 +29,7 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       package_file: ${{ steps.release.outputs.package_file }}
       mcpb_file: ${{ steps.release.outputs.mcpb_file }}
+      server_card_file: ${{ steps.release.outputs.server_card_file }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -83,6 +84,7 @@ jobs:
           npm run mcpb:pack
           npm pack --ignore-scripts --pack-destination .
           test -f "$PACKAGE_FILE"
+          test -f "$SERVER_CARD_FILE"
           unzip -t "$MCPB_FILE"
           npm run audit:artifact -- "./$PACKAGE_FILE"
 
@@ -119,7 +121,7 @@ jobs:
           upload-release-assets: false
 
       - name: Registrar checksums dos artefatos
-        run: sha256sum "$PACKAGE_FILE" "$MCPB_FILE" "$SBOM_FILE" > SHA256SUMS
+        run: sha256sum "$PACKAGE_FILE" "$MCPB_FILE" "$SERVER_CARD_FILE" "$SBOM_FILE" > SHA256SUMS
 
       - name: Transferir artefatos imutáveis aos jobs de publicação
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -128,8 +130,13 @@ jobs:
           path: |
             ${{ steps.release.outputs.package_file }}
             ${{ steps.release.outputs.mcpb_file }}
+            ${{ steps.release.outputs.server_card_file }}
             mcp-server-efi-image.spdx.json
             SHA256SUMS
+            manifest.json
+            scripts/publish-smithery.mjs
+            scripts/publish-smithery-lib.mjs
+            scripts/smithery-quality.mjs
           if-no-files-found: error
           retention-days: 7
 
@@ -239,8 +246,9 @@ jobs:
     permissions: {}
     env:
       MCPB_FILE: ${{ needs.preflight.outputs.mcpb_file }}
+      SERVER_CARD_FILE: ${{ needs.preflight.outputs.server_card_file }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
@@ -256,7 +264,11 @@ jobs:
       - name: Publicar bundle local no Smithery
         env:
           SMITHERY_API_KEY: ${{ secrets.SMITHERY_API_KEY }}
-        run: npx --yes smithery@1.2.0 mcp publish "./$MCPB_FILE" -n efipay/mcp-server-efi
+        run: |
+          node scripts/publish-smithery.mjs \
+            --bundle "./$MCPB_FILE" \
+            --server-card "./$SERVER_CARD_FILE" \
+            --qualified-name efipay/mcp-server-efi
 
   github-release:
     name: Criar GitHub Release após todos os canais
@@ -268,6 +280,7 @@ jobs:
       VERSION: ${{ needs.preflight.outputs.version }}
       PACKAGE_FILE: ${{ needs.preflight.outputs.package_file }}
       MCPB_FILE: ${{ needs.preflight.outputs.mcpb_file }}
+      SERVER_CARD_FILE: ${{ needs.preflight.outputs.server_card_file }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -291,6 +304,7 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             "release-artifacts/$PACKAGE_FILE" \
             "release-artifacts/$MCPB_FILE" \
+            "release-artifacts/$SERVER_CARD_FILE" \
             "release-artifacts/$SBOM_FILE" \
             "release-artifacts/SHA256SUMS" \
             --verify-tag \

@@ -9,24 +9,28 @@ import {
   type ApiGroup,
   type SensitiveToolName,
 } from '../catalog/index.js';
-import { createServer, SERVER_INFO } from './createServer.js';
+import { createServer, SERVER_INFO, type CreateServerOptions } from './createServer.js';
 import { PIX_RECEIPT_URI_TEMPLATE } from './receiptResource.js';
+
+async function connectedWithOptions(options: CreateServerOptions) {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createServer(options);
+  const client = new Client({ name: 'test-client', version: '1.0.0' });
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+  return { client, server };
+}
 
 async function connected(
   clientImplementation: Partial<EfiPay> = {},
   enabledApis: ReadonlySet<ApiGroup> = new Set(API_GROUPS),
-  enabledSensitiveTools: ReadonlySet<SensitiveToolName> = new Set(),
+  allowedSensitiveTools: ReadonlySet<SensitiveToolName> = new Set(),
 ) {
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const server = createServer({
+  return connectedWithOptions({
     sdk: { sandbox: true, client_id: 'id', client_secret: 'secret' },
     enabledApis,
-    enabledSensitiveTools,
+    allowedSensitiveTools,
     client: clientImplementation as EfiPay,
   });
-  const client = new Client({ name: 'test-client', version: '1.0.0' });
-  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
-  return { client, server };
 }
 
 async function close(connection: Awaited<ReturnType<typeof connected>>): Promise<void> {
@@ -34,8 +38,30 @@ async function close(connection: Awaited<ReturnType<typeof connected>>): Promise
   await connection.server.close();
 }
 
+function expectSchemaDescriptions(schema: unknown, path = 'schema'): void {
+  if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return;
+  const node = schema as Record<string, unknown>;
+  expect(node.description, path).toEqual(expect.any(String));
+
+  if (typeof node.properties === 'object' && node.properties !== null) {
+    for (const [name, property] of Object.entries(node.properties)) {
+      expectSchemaDescriptions(property, `${path}.properties.${name}`);
+    }
+  }
+  expectSchemaDescriptions(node.items, `${path}.items`);
+  expectSchemaDescriptions(node.additionalProperties, `${path}.additionalProperties`);
+  expectSchemaDescriptions(node.propertyNames, `${path}.propertyNames`);
+  expectSchemaDescriptions(node.not, `${path}.not`);
+  for (const keyword of ['anyOf', 'oneOf', 'allOf'] as const) {
+    if (!Array.isArray(node[keyword])) continue;
+    node[keyword].forEach((entry, index) =>
+      expectSchemaDescriptions(entry, `${path}.${keyword}[${index}]`),
+    );
+  }
+}
+
 describe('servidor MCP', () => {
-  it('publica 170 tools por padrão, ocultando respostas sensíveis', async () => {
+  it('publica as 173 tools por padrão, incluindo operações com execução sensível', async () => {
     const connection = await connected();
     const result = await connection.client.listTools();
     const capabilities = connection.client.getServerCapabilities();
@@ -44,7 +70,7 @@ describe('servidor MCP', () => {
       name: SERVER_INFO.name,
       version: SERVER_INFO.version,
     });
-    expect(result.tools).toHaveLength(170);
+    expect(result.tools).toHaveLength(173);
     expect(capabilities).toMatchObject({ tools: {}, resources: {} });
     for (const unsupported of ['prompts', 'logging', 'sampling', 'elicitation', 'tasks'] as const) {
       expect(capabilities).not.toHaveProperty(unsupported);
@@ -61,7 +87,9 @@ describe('servidor MCP', () => {
       ]);
       expect(tool.description).toBeTruthy();
       expect(tool.inputSchema.type).toBe('object');
-      if (tool.outputSchema) expect(tool.outputSchema.type).toBe('object');
+      expect(tool.outputSchema?.type).toBe('object');
+      expectSchemaDescriptions(tool.inputSchema, `${tool.name}.inputSchema`);
+      expectSchemaDescriptions(tool.outputSchema, `${tool.name}.outputSchema`);
       expect(Object.keys(onWire).every((field) => allowedFields.has(field))).toBe(true);
       expect(onWire).not.toHaveProperty('execution');
       expect(Object.keys(tool)).toEqual(
@@ -76,17 +104,85 @@ describe('servidor MCP', () => {
       expect(JSON.stringify(onWire)).not.toContain('httpMethod');
       expect(JSON.stringify(onWire)).not.toContain('route');
     }
-    expect(result.tools.filter(({ outputSchema }) => outputSchema)).toHaveLength(169);
+    expect(result.tools.filter(({ outputSchema }) => outputSchema)).toHaveLength(173);
     for (const sensitive of SENSITIVE_TOOL_NAMES) {
-      expect(result.tools.some(({ name }) => name === sensitive)).toBe(false);
+      expect(result.tools.some(({ name }) => name === sensitive)).toBe(true);
     }
 
     await close(connection);
   });
 
-  it('publica as 173 tools somente após allowlist sensível explícita', async () => {
+  it('mantém as 173 tools publicadas após allowlist sensível explícita', async () => {
     const connection = await connected({}, new Set(API_GROUPS), new Set(SENSITIVE_TOOL_NAMES));
     expect((await connection.client.listTools()).tools).toHaveLength(173);
+    await close(connection);
+  });
+
+  it('inicia sem credenciais, lista 173 tools e não cria cliente em chamada HTTP inválida', async () => {
+    const clientFactory = vi.fn();
+    const connection = await connectedWithOptions({
+      sdk: { sandbox: true, cert_base64: true, validateMtls: true, cache: true },
+      enabledApis: new Set(API_GROUPS),
+      clientFactory,
+    });
+
+    expect((await connection.client.listTools()).tools).toHaveLength(173);
+    const result = await connection.client.callTool({
+      name: 'detail_charge',
+      arguments: { params: { id: 1 } },
+    });
+    const text = result.content[0]?.type === 'text' ? result.content[0].text : '';
+
+    expect(result.isError).toBe(true);
+    expect(text).toContain('EFI_CLIENT_ID');
+    expect(text).toContain('EFI_CLIENT_SECRET');
+    expect(clientFactory).not.toHaveBeenCalled();
+    await close(connection);
+  });
+
+  it('exige certificado somente ao executar uma operação mTLS', async () => {
+    const clientFactory = vi.fn();
+    const connection = await connectedWithOptions({
+      sdk: {
+        sandbox: true,
+        client_id: 'id',
+        client_secret: 'secret',
+        cert_base64: true,
+        validateMtls: true,
+        cache: true,
+      },
+      enabledApis: new Set(['pix']),
+      clientFactory,
+    });
+
+    const result = await connection.client.callTool({ name: 'pix_create_evp' });
+    const text = result.content[0]?.type === 'text' ? result.content[0].text : '';
+    expect(result.isError).toBe(true);
+    expect(text).toContain('EFI_CERTIFICATE');
+    expect(clientFactory).not.toHaveBeenCalled();
+    await close(connection);
+  });
+
+  it('executa a geração Pix local pelo SDK sem credenciais', async () => {
+    const connection = await connectedWithOptions({
+      sdk: { sandbox: true, cert_base64: true, validateMtls: true, cache: true },
+      enabledApis: new Set(['pix']),
+    });
+
+    const result = await connection.client.callTool({
+      name: 'pix_generate_static_qr_code',
+      arguments: {
+        body: { chave: 'chave', merchantName: 'LOJA', merchantCity: 'BELO HORIZONTE' },
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      result: {
+        qrcode: expect.any(String),
+        imagemQrcode: expect.stringContaining('data:image/svg+xml'),
+      },
+    });
     await close(connection);
   });
 
@@ -303,6 +399,17 @@ describe('servidor MCP', () => {
         mimeType: 'application/pdf',
       },
     });
+    expect(toolResult.structuredContent).toEqual({
+      result: {
+        uri: 'efi://pix/comprovantes/rtrId/return%2F1.pdf',
+        mimeType: 'application/pdf',
+        identifier: { type: 'rtrId', id: 'return/1' },
+      },
+    });
+    const text = toolResult.content.find((item) => item.type === 'text');
+    expect(text?.type === 'text' ? JSON.parse(text.text) : undefined).toEqual(
+      toolResult.structuredContent,
+    );
 
     const resource = await connection.client.readResource({
       uri: 'efi://pix/comprovantes/rtrId/return%2F1.pdf',
@@ -401,14 +508,24 @@ describe('servidor MCP', () => {
     await close(connection);
   });
 
-  it('trata chamada direta de tool sensível oculta como InvalidParams', async () => {
-    const connection = await connected({}, new Set(['abertura-contas']));
-    await expect(
-      connection.client.callTool({
-        name: 'get_account_credentials',
-        arguments: { params: { idContaSimplificada: 'conta-1' } },
-      }),
-    ).rejects.toMatchObject({ code: ErrorCode.InvalidParams });
+  it('lista tool sensível, mas bloqueia sua execução sem aceite explícito', async () => {
+    const getAccountCredentials = vi.fn();
+    const connection = await connected({ getAccountCredentials }, new Set(['abertura-contas']));
+    expect(
+      (await connection.client.listTools()).tools.some(
+        ({ name }) => name === 'get_account_credentials',
+      ),
+    ).toBe(true);
+
+    const result = await connection.client.callTool({
+      name: 'get_account_credentials',
+      arguments: { params: { idContaSimplificada: 'conta-1' } },
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.type === 'text' ? result.content[0].text : '').toContain(
+      'EFI_ACCEPT_SENSITIVE_OUTPUT_RISK',
+    );
+    expect(getAccountCredentials).not.toHaveBeenCalled();
     await close(connection);
   });
 

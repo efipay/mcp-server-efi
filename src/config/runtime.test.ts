@@ -17,6 +17,45 @@ describe('configuração de runtime', () => {
     expect(config.sdk.cache).toBe(true);
   });
 
+  it('inicia com ambiente vazio e aplica defaults seguros', () => {
+    const config = loadRuntimeConfig([], {});
+
+    expect([...config.enabledApis]).toHaveLength(6);
+    expect(config.sdk).toMatchObject({
+      sandbox: true,
+      cert_base64: true,
+      validateMtls: true,
+      cache: true,
+    });
+    expect(config.sdk.client_id).toBeUndefined();
+    expect(config.sdk.client_secret).toBeUndefined();
+    expect(config.sdk.certificate).toBeUndefined();
+  });
+
+  it('trata placeholders MCPB opcionais não resolvidos como valores ausentes', () => {
+    const config = loadRuntimeConfig([], {
+      EFI_CLIENT_ID: '${user_config.client_id}',
+      EFI_CLIENT_SECRET: '${user_config.client_secret}',
+      EFI_CERTIFICATE: '${user_config.certificate}',
+      EFI_SANDBOX: '${user_config.sandbox}',
+      EFI_APIS: '${user_config.apis}',
+      EFI_CERT_BASE64: '${user_config.cert_base64}',
+      EFI_VALIDATE_MTLS: '${user_config.validate_mtls}',
+      EFI_CACHE: '${user_config.cache}',
+    });
+
+    expect(config.sdk).toMatchObject({
+      sandbox: true,
+      cert_base64: true,
+      validateMtls: true,
+      cache: true,
+    });
+    expect(config.sdk.client_id).toBeUndefined();
+    expect(config.sdk.client_secret).toBeUndefined();
+    expect(config.sdk.certificate).toBeUndefined();
+    expect(config.enabledApis.size).toBe(6);
+  });
+
   it('aplica precedência CLI, EFI_* e variável legada somente às opções não secretas', () => {
     const config = loadRuntimeConfig(
       [
@@ -108,22 +147,16 @@ describe('configuração de runtime', () => {
   });
 
   it('não aceita aliases de ambiente para material sensível', () => {
-    expect(() =>
-      loadRuntimeConfig([], {
-        SANDBOX: 'true',
-        CLIENT_ID: 'legacy-id',
-        CLIENT_SECRET: 'legacy-secret',
-        CERTIFICATE: 'legacy-certificate',
-      }),
-    ).toThrow(/EFI_CERTIFICATE/);
+    const config = loadRuntimeConfig([], {
+      SANDBOX: 'true',
+      CLIENT_ID: 'legacy-id',
+      CLIENT_SECRET: 'legacy-secret',
+      CERTIFICATE: 'legacy-certificate',
+    });
 
-    expect(() =>
-      loadRuntimeConfig(['--apis=cobrancas'], {
-        SANDBOX: 'true',
-        CLIENT_ID: 'legacy-id',
-        CLIENT_SECRET: 'legacy-secret',
-      }),
-    ).toThrow(/EFI_CLIENT_ID/);
+    expect(config.sdk.client_id).toBeUndefined();
+    expect(config.sdk.client_secret).toBeUndefined();
+    expect(config.sdk.certificate).toBeUndefined();
   });
 
   it.each([
@@ -148,22 +181,18 @@ describe('configuração de runtime', () => {
     expect(() => loadRuntimeConfig(['--apis=,,,'], baseEnv)).toThrow(ConfigurationError);
   });
 
-  it('exige certificado somente quando alguma API mTLS está habilitada', () => {
-    expect(() =>
-      loadRuntimeConfig([], {
-        EFI_SANDBOX: 'true',
-        EFI_CLIENT_ID: 'id',
-        EFI_CLIENT_SECRET: 'secret',
-      }),
-    ).toThrow(/EFI_CERTIFICATE/);
+  it('adia a exigência de certificado para a execução da operação mTLS', () => {
+    const allApis = loadRuntimeConfig([], {
+      EFI_CLIENT_ID: 'id',
+      EFI_CLIENT_SECRET: 'secret',
+    });
+    const cobrancas = loadRuntimeConfig(['--apis=cobrancas'], {
+      EFI_CLIENT_ID: 'id',
+      EFI_CLIENT_SECRET: 'secret',
+    });
 
-    expect(() =>
-      loadRuntimeConfig(['--apis=cobrancas'], {
-        EFI_SANDBOX: 'true',
-        EFI_CLIENT_ID: 'id',
-        EFI_CLIENT_SECRET: 'secret',
-      }),
-    ).not.toThrow();
+    expect(allApis.sdk.certificate).toBeUndefined();
+    expect(cobrancas.sdk.certificate).toBeUndefined();
   });
 
   it('expõe ajuda sem sugerir credenciais por argumentos', () => {
@@ -177,15 +206,15 @@ describe('configuração de runtime', () => {
     );
   });
 
-  it('oculta tools sensíveis por padrão e exige allowlist com aceite literal', () => {
-    expect(loadRuntimeConfig([], baseEnv).enabledSensitiveTools.size).toBe(0);
+  it('mantém tools sensíveis bloqueadas por padrão e exige allowlist com aceite literal', () => {
+    expect(loadRuntimeConfig([], baseEnv).allowedSensitiveTools.size).toBe(0);
 
     const config = loadRuntimeConfig([], {
       ...baseEnv,
       EFI_SENSITIVE_TOOLS: 'create_account_certificate,get_account_credentials,create_sftp_key',
       EFI_ACCEPT_SENSITIVE_OUTPUT_RISK: 'I_UNDERSTAND',
     });
-    expect([...config.enabledSensitiveTools]).toEqual([
+    expect([...config.allowedSensitiveTools]).toEqual([
       'create_account_certificate',
       'get_account_credentials',
       'create_sftp_key',

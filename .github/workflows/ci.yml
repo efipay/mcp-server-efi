@@ -73,7 +73,10 @@ jobs:
         run: |
           npm run mcpb:pack
           MCPB_FILE="mcp-server-efi-$VERSION.mcpb"
+          SERVER_CARD_FILE="smithery-server-card-$VERSION.json"
+          test -f "$SERVER_CARD_FILE"
           unzip -l "$MCPB_FILE" | grep -F 'manifest.json'
+          unzip -l "$MCPB_FILE" | grep -F 'icon.svg'
           unzip -l "$MCPB_FILE" | grep -F 'dist/src/index.js'
           unzip -l "$MCPB_FILE" | grep -F 'node_modules/'
 

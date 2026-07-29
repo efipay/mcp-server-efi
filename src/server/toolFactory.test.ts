@@ -152,6 +152,34 @@ describe('factory de tools', () => {
         }),
       ]),
     );
+    expect(result.structuredContent).toEqual({
+      result: {
+        uri: 'efi://pix/comprovantes/txid/tx%2F1.pdf',
+        mimeType: 'application/pdf',
+        identifier: { type: 'txid', id: 'tx/1' },
+      },
+    });
+    expect(JSON.parse(textOf(result))).toEqual(result.structuredContent);
+  });
+
+  it('bloqueia execução sensível até a allowlist explícita', async () => {
+    const getAccountCredentials = vi.fn().mockRejectedValue({ reason: 'fixture' });
+    const definitionSensitive = definition('getAccountCredentials');
+
+    const blocked = await createToolHandler(definitionSensitive, {
+      getAccountCredentials,
+    } as unknown as EfiPay)({
+      params: { idContaSimplificada: 'conta-1' },
+    });
+    expect(blocked.isError).toBe(true);
+    expect(getAccountCredentials).not.toHaveBeenCalled();
+
+    await createToolHandler(definitionSensitive, { getAccountCredentials } as unknown as EfiPay, {
+      allowedSensitiveTools: new Set(['get_account_credentials']),
+    })({
+      params: { idContaSimplificada: 'conta-1' },
+    });
+    expect(getAccountCredentials).toHaveBeenCalledWith({ idContaSimplificada: 'conta-1' });
   });
 
   it('retorna QR Code canônico integral e também como imagem', async () => {

@@ -18,6 +18,7 @@ build/
 coverage/
 *.mcpb
 *.tgz
+smithery-server-card-*.json
 
 # IDE and Editors
 .idea/

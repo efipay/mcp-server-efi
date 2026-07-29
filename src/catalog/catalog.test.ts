@@ -81,11 +81,7 @@ describe('catálogo de tools', () => {
       expect(z.toJSONSchema(inputSchemaFor(tool))).toMatchObject({ type: 'object' });
 
       const outputSchema = outputSchemaFor(tool);
-      if (tool.responseKind === 'pdf') {
-        expect(outputSchema).toBeUndefined();
-      } else {
-        expect(z.toJSONSchema(outputSchema!)).toMatchObject({ type: 'object' });
-      }
+      expect(z.toJSONSchema(outputSchema!)).toMatchObject({ type: 'object' });
 
       if (tool.responseKind === 'json' || tool.responseKind === 'qr') {
         expect(tool.responseSchema).toBeDefined();

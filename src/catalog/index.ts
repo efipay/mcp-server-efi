@@ -28,6 +28,23 @@ export const PIX_QR_CODE_VERIFICATION_SCHEMA = z
   })
   .strict();
 
+export const PIX_RECEIPT_OUTPUT_SCHEMA = z
+  .object({
+    result: z
+      .object({
+        uri: z.string(),
+        mimeType: z.literal('application/pdf'),
+        identifier: z
+          .object({
+            type: z.enum(['txid', 'e2eid', 'idEnvio', 'rtrId']),
+            id: z.string(),
+          })
+          .strict(),
+      })
+      .strict(),
+  })
+  .strict();
+
 export function methodToToolName(method: string): string {
   return method
     .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
@@ -79,7 +96,7 @@ export function inputSchemaFor(definition: ToolDefinition): z.ZodObject {
 }
 
 export function outputSchemaFor(definition: ToolDefinition): z.ZodObject | undefined {
-  if (definition.responseKind === 'pdf') return undefined;
+  if (definition.responseKind === 'pdf') return PIX_RECEIPT_OUTPUT_SCHEMA;
   if (definition.responseKind === 'void') return z.object({ success: z.literal(true) }).strict();
   if (!definition.responseSchema) return undefined;
   return z

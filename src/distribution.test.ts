@@ -43,6 +43,8 @@ describe('distribuição', () => {
     expect(packageJson.scripts.start).toContain('dist/src/index.js');
     expect(mcpb.manifest_version).toBe('0.3');
     expect(mcpb.version).toBe(packageJson.version);
+    expect(mcpb.icon).toBe('icon.svg');
+    expect(existsSync(resolve(process.cwd(), 'assets/icon.svg'))).toBe(true);
     expect(mcpb.server.entry_point).toBe('dist/src/index.js');
     expect(mcpb.server.mcp_config.args).toEqual(['${__dirname}/dist/src/index.js']);
     expect(existsSync(resolve(process.cwd(), 'smithery.yaml'))).toBe(false);
@@ -147,31 +149,30 @@ describe('distribuição', () => {
     expect(parsed.user_config.client_secret.sensitive).toBe(true);
     expect(parsed.user_config.certificate.sensitive).toBe(true);
     expect(parsed.user_config.certificate.required).toBe(false);
-    expect(parsed.user_config.apis.default).toBe('cobrancas');
+    expect(
+      Object.values(parsed.user_config).every(
+        (field) => (field as { required?: boolean }).required !== true,
+      ),
+    ).toBe(true);
+    expect(parsed.user_config.apis.default).toBe(
+      'cobrancas,pix,open-finance,pagamento-contas,abertura-contas,extratos',
+    );
   });
 
-  it('inicia o padrão MCPB sem certificado e volta a exigi-lo ao ampliar APIs', () => {
+  it('aceita configuração MCPB vazia e habilita todos os domínios', () => {
     const mcpb = JSON.parse(read('manifest.json')) as Record<string, any>;
-    const baseEnvironment = {
-      EFI_SANDBOX: 'true',
-      EFI_CLIENT_ID: 'id',
-      EFI_CLIENT_SECRET: 'secret',
-    };
-    const defaultApi = String(mcpb.user_config.apis.default);
-
-    const configuration = loadRuntimeConfig([], {
-      ...baseEnvironment,
-      EFI_APIS: defaultApi,
-    });
-    expect([...configuration.enabledApis]).toEqual(['cobrancas']);
+    const configuration = loadRuntimeConfig([], mcpb.server.mcp_config.env as NodeJS.ProcessEnv);
+    expect([...configuration.enabledApis]).toEqual([
+      'cobrancas',
+      'pix',
+      'open-finance',
+      'pagamento-contas',
+      'abertura-contas',
+      'extratos',
+    ]);
     expect(configuration.sdk.certificate).toBeUndefined();
-
-    expect(() =>
-      loadRuntimeConfig([], {
-        ...baseEnvironment,
-        EFI_APIS: `${defaultApi},pix`,
-      }),
-    ).toThrow(/EFI_CERTIFICATE/);
+    expect(configuration.sdk.client_id).toBeUndefined();
+    expect(configuration.sdk.client_secret).toBeUndefined();
   });
 
   it('mantém no CI todos os gates de distribuição e segurança', () => {
@@ -187,6 +188,8 @@ describe('distribuição', () => {
     expect(workflow).toContain('npm run mcpb:pack');
     expect(workflow).toContain('test "$PACKAGE_FILE" = "mcp-server-efi-$VERSION.tgz"');
     expect(workflow).toContain('MCPB_FILE="mcp-server-efi-$VERSION.mcpb"');
+    expect(workflow).toContain('SERVER_CARD_FILE="smithery-server-card-$VERSION.json"');
+    expect(workflow).toContain("grep -F 'icon.svg'");
     expect(workflow).not.toContain('mcp-server-efi-1.0.0');
     expect(workflow).toMatch(/NODE_TLS_REJECT_UNAUTHORIZED: ['"]1['"]/);
     expect(workflow).toMatch(/npm_config_strict_ssl: ['"]true['"]/);
@@ -233,9 +236,9 @@ describe('distribuição', () => {
     );
     expect(workflow).toMatch(/publish-smithery:[\s\S]*?permissions: \{\}/);
     expect(workflow).toContain('SMITHERY_API_KEY');
-    expect(workflow).toContain(
-      'smithery@1.2.0 mcp publish "./$MCPB_FILE" -n efipay/mcp-server-efi',
-    );
+    expect(workflow).toContain('node scripts/publish-smithery.mjs');
+    expect(workflow).toContain('--server-card "./$SERVER_CARD_FILE"');
+    expect(workflow).not.toContain('smithery@1.2.0 mcp publish');
     expect(workflow).toContain('--tag "$IMAGE:$VERSION"');
     expect(workflow).toContain('--title "mcp-server-efi $VERSION"');
     expect(workflow).not.toContain('mcp-server-efi-1.0.0.tgz');
@@ -262,6 +265,7 @@ describe('distribuição', () => {
     expect(workflow).toContain('npm publish "./$PACKAGE_FILE" --access public --provenance');
     expect(workflow).toContain('"release-artifacts/$PACKAGE_FILE"');
     expect(workflow).toContain('"release-artifacts/$MCPB_FILE"');
+    expect(workflow).toContain('"release-artifacts/$SERVER_CARD_FILE"');
     expect(workflow).toContain('"release-artifacts/$SBOM_FILE"');
     expect(workflow).toContain('"release-artifacts/SHA256SUMS"');
     expect(workflow.match(/sha256sum --check SHA256SUMS/g)).toHaveLength(4);

@@ -71,6 +71,7 @@ describe('scripts de coordenação do release', () => {
           `version=${version}`,
           `package_file=mcp-server-efi-${version}.tgz`,
           `mcpb_file=mcp-server-efi-${version}.mcpb`,
+          `server_card_file=smithery-server-card-${version}.json`,
           '',
         ].join('\n'),
       );
@@ -79,6 +80,7 @@ describe('scripts de coordenação do release', () => {
           `VERSION=${version}`,
           `PACKAGE_FILE=mcp-server-efi-${version}.tgz`,
           `MCPB_FILE=mcp-server-efi-${version}.mcpb`,
+          `SERVER_CARD_FILE=smithery-server-card-${version}.json`,
           '',
         ].join('\n'),
       );

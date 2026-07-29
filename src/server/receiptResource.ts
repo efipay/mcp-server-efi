@@ -3,7 +3,11 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type EfiPay from 'sdk-node-apis-efi';
 import { TOOL_CATALOG, type ToolDefinition } from '../catalog/index.js';
 import type { ToolRequestGuard } from './requestGuard.js';
-import { sanitizeError, type ReceiptParameterName } from './toolFactory.js';
+import {
+  sanitizeError,
+  type EfiPayClientProvider,
+  type ReceiptParameterName,
+} from './toolFactory.js';
 
 export const PIX_RECEIPT_URI_TEMPLATE = 'efi://pix/comprovantes/{tipo}/{id}.pdf';
 
@@ -55,7 +59,7 @@ export interface PixReceiptResourceOptions {
 
 export function registerPixReceiptResource(
   server: McpServer,
-  client: EfiPay,
+  clientProvider: EfiPayClientProvider,
   options: PixReceiptResourceOptions = {},
 ): void {
   const template = new ResourceTemplate(PIX_RECEIPT_URI_TEMPLATE, { list: undefined });
@@ -88,6 +92,7 @@ export function registerPixReceiptResource(
 
       let receipt: unknown;
       try {
+        const client = clientProvider(RECEIPT_DEFINITION);
         receipt = await client.pixGetReceipt(receiptParams(type, id));
       } catch (error) {
         throw new McpError(
