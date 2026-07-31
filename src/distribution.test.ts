@@ -95,18 +95,19 @@ describe('distribuição', () => {
     expect(mcpExample).not.toMatch(/--client-id|--client-secret|--certificate/);
   });
 
-  it('fixa dependências de runtime e mantém somente o override Hono documentado', () => {
+  it('controla dependências de runtime e mantém somente o override Hono documentado', () => {
     const packageJson = JSON.parse(read('package.json')) as PackageManifest;
     const packageLock = JSON.parse(read('package-lock.json')) as PackageLock;
 
     expect(packageJson.overrides).toEqual({ '@hono/node-server': '2.0.11' });
     expect(packageLock.packages['node_modules/@hono/node-server']?.version).toBe('2.0.11');
     expect(packageLock.packages['node_modules/brace-expansion']?.version).toBe('5.0.8');
+    expect(packageLock.packages['node_modules/sdk-node-apis-efi']?.version).toBe('2.0.1');
     expect(packageJson.dependencies).toMatchObject({
       '@modelcontextprotocol/sdk': '1.29.0',
       jose: '6.2.4',
       'pix-qr-code-detail': '1.2.0',
-      'sdk-node-apis-efi': '2.0.0',
+      'sdk-node-apis-efi': '^2.0.1',
       zod: '4.4.3',
     });
     expect(packageJson.devDependencies).toMatchObject({
@@ -117,6 +118,18 @@ describe('distribuição', () => {
       vitest: '4.1.10',
     });
     expect(packageJson.publishConfig).toEqual({ access: 'public', provenance: true });
+  });
+
+  it('acompanha atualizações compatíveis do SDK Efí por meio do Dependabot', () => {
+    const packageJson = JSON.parse(read('package.json')) as PackageManifest;
+    const dependabot = read('.github/dependabot.yml');
+
+    expect(packageJson.dependencies['sdk-node-apis-efi']).toBe('^2.0.1');
+    expect(dependabot).toMatch(/package-ecosystem: npm/);
+    expect(dependabot).toMatch(/interval: daily/);
+    expect(dependabot).toMatch(/versioning-strategy: lockfile-only/);
+    expect(dependabot).toMatch(/allow:[\s\S]*?dependency-name: sdk-node-apis-efi/);
+    expect(dependabot).toMatch(/sdk-efi:[\s\S]*?- sdk-node-apis-efi/);
   });
 
   it('não transporta material secreto em argumentos públicos', () => {

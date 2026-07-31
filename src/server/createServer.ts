@@ -13,7 +13,7 @@ import {
 export const SERVER_INFO = {
   name: 'mcp-server-efi',
   title: 'Servidor MCP Efí',
-  version: '1.0.1',
+  version: '1.0.2',
   description: 'Servidor MCP tipado para as APIs da Efí.',
   websiteUrl: 'https://github.com/efipay/mcp-server-efi',
   icons: [
@@ -57,7 +57,7 @@ function createClientProvider(options: CreateServerOptions): EfiPayClientProvide
 
   return (definition) => {
     if (definition.httpMethod === 'local') {
-      // O SDK 2.0.0 exige credenciais no construtor, embora pixGenerateStaticQRCode seja
+      // O SDK Efí 2.x exige credenciais no construtor, embora pixGenerateStaticQRCode seja
       // inteiramente local. Os valores sentinela nunca são usados em autenticação ou tráfego.
       localClient ??= instantiate({
         sandbox: options.sdk.sandbox,

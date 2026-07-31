@@ -1,0 +1,20 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+      time: '09:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 10
+    rebase-strategy: auto
+    versioning-strategy: lockfile-only
+    allow:
+      - dependency-name: sdk-node-apis-efi
+    groups:
+      sdk-efi:
+        patterns:
+          - sdk-node-apis-efi
+    labels:
+      - dependencies

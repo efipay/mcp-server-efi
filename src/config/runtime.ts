@@ -226,7 +226,7 @@ export function loadRuntimeConfig(
 }
 
 export function helpText(): string {
-  return `mcp-server-efi 1.0.1
+  return `mcp-server-efi 1.0.2
 
 Uso: mcp-server-efi [opções]
 

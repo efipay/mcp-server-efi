@@ -89,6 +89,31 @@ describe('catálogo de tools', () => {
     }
   });
 
+  it('aceita payload dinâmico Pix sem recebedor sem relaxar os demais campos', () => {
+    const definition = TOOL_CATALOG.find(({ method }) => method === 'pixQrCodeDetail')!;
+    const payload = {
+      tipoCob: 'cob',
+      txid: 'txid-1',
+      revisao: 0,
+      status: 'ATIVA',
+      chave: 'pix@example.test',
+      calendario: {
+        criacao: '2026-07-31T00:00:00Z',
+        apresentacao: '2026-07-31T00:00:00Z',
+        expiracao: 3600,
+      },
+      valor: { original: '1.00' },
+    };
+
+    expect(definition.responseSchema?.safeParse(payload)).toMatchObject({ success: true });
+
+    const withoutRequiredSdkField: Partial<typeof payload> = { ...payload };
+    delete withoutRequiredSdkField.chave;
+    expect(definition.responseSchema?.safeParse(withoutRequiredSdkField)).toMatchObject({
+      success: false,
+    });
+  });
+
   it('mantém as contagens de resposta auditadas', () => {
     expect(countBy(TOOL_CATALOG.map(({ responseKind }) => responseKind))).toEqual({
       json: 153,

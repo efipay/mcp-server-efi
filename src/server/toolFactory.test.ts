@@ -11,7 +11,7 @@ function textOf(result: Awaited<ReturnType<ReturnType<typeof createToolHandler>>
 }
 
 describe('factory de tools', () => {
-  it('monta os quatro formatos de overload do SDK 2.0.0', async () => {
+  it('monta os quatro formatos de overload do SDK Efí 2.x', async () => {
     const pixCreateEvp = vi.fn().mockRejectedValue({ reason: 'fixture' });
     const pixCreateImmediateCharge = vi.fn().mockRejectedValue({ reason: 'fixture' });
     const pixDetailCharge = vi.fn().mockRejectedValue({ reason: 'fixture' });

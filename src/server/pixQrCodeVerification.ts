@@ -57,7 +57,7 @@ function unavailableVerification(originMatch: boolean | null): PixQrCodeVerifica
 }
 
 /**
- * Reproduz a implementação pública do SDK 2.0.0 para obter e decodificar o payload,
+ * Reproduz a implementação pública do SDK Efí 2.x para obter e decodificar o payload,
  * preservando o JWS compacto e o cabeçalho que o wrapper do SDK não devolve.
  */
 export async function inspectPixQrCode(

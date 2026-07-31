@@ -1,6 +1,6 @@
 {
   "name": "mcp-server-efi",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Um serviço que permite o consumo das APIs do Efí Bank através de um servidor MCP.",
   "author": "João Lucas Alberto Muniz",
   "repository": {
@@ -58,7 +58,7 @@
     "@modelcontextprotocol/sdk": "1.29.0",
     "jose": "6.2.4",
     "pix-qr-code-detail": "1.2.0",
-    "sdk-node-apis-efi": "2.0.0",
+    "sdk-node-apis-efi": "^2.0.1",
     "zod": "4.4.3"
   },
   "devDependencies": {

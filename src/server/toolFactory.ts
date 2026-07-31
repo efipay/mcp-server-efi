@@ -198,7 +198,7 @@ async function successResult(
   if (definition.responseKind === 'void') {
     if (result !== undefined) {
       throw new InternalToolError(
-        `O método ${definition.method} retornou conteúdo apesar do contrato void do SDK 2.0.0.`,
+        `O método ${definition.method} retornou conteúdo apesar do contrato void do SDK Efí.`,
       );
     }
     const canonical = { success: true } as const;
@@ -212,7 +212,7 @@ async function successResult(
   if (!parsed?.success) {
     const detail = parsed ? parsed.error.message : 'schema de resposta ausente';
     throw new InternalToolError(
-      `A resposta de ${definition.method} não corresponde ao contrato do SDK 2.0.0: ${detail}`,
+      `A resposta de ${definition.method} não corresponde ao contrato do SDK Efí: ${detail}`,
     );
   }
 

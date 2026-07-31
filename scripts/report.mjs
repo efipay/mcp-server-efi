@@ -18,7 +18,7 @@ const apiLabels = {
 
 export function coverageReport() {
   const lines = [
-    '# Cobertura de tools do SDK Efí 2.0.0',
+    '# Cobertura de tools do SDK Efí 2.x',
     '',
     'Relatório de desenvolvimento. Os contratos vêm do SDK; as referências indicam apenas as fontes usadas para redigir as descrições.',
     '',

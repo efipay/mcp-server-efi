@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 — 2026-07-31
+
+- Os contratos públicos acompanham automaticamente as atualizações compatíveis do `sdk-node-apis-efi` 2.x via dependabot.
+
 ## 1.0.1 — 2026-07-29
 
 - Inicialização e descoberta das 173 tools sem exigir credenciais.

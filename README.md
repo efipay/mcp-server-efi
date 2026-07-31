@@ -1,9 +1,9 @@
 # Servidor MCP Efí
 
 Servidor MCP oficial da Efí, executado via `stdio`, que disponibiliza as APIs da
-Efí pelo Model Context Protocol (MCP). Os contratos públicos vêm do
-`sdk-node-apis-efi@2.0.0`; a documentação Efí é usada para redigir descrições
-úteis, sem alterar tipos ou validações do SDK.
+Efí pelo Model Context Protocol (MCP). Os contratos públicos acompanham as
+atualizações compatíveis do `sdk-node-apis-efi` 2.x; a documentação Efí é usada
+para redigir descrições úteis, sem alterar tipos ou validações do SDK.
 
 Este é o [repositório oficial do projeto](https://github.com/efipay/mcp-server-efi)
 e a origem dos pacotes publicados pela Efí.
@@ -163,13 +163,13 @@ runtime contém o executável `node` e as dependências de produção, mas não 
 gerenciador de pacotes.
 
 ```bash
-docker pull ghcr.io/efipay/mcp-server-efi:1.0.1
+docker pull ghcr.io/efipay/mcp-server-efi:1.0.2
 
 docker run -i --rm \
   --env-file .env.efi \
   --mount type=bind,source=/caminho/absoluto/certificado.p12,target=/run/secrets/efi.p12,readonly \
   --env EFI_CERTIFICATE=/run/secrets/efi.p12 \
-  ghcr.io/efipay/mcp-server-efi:1.0.1 \
+  ghcr.io/efipay/mcp-server-efi:1.0.2 \
   --apis=pix,open-finance
 ```
 

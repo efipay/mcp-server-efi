@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "mcp-server-efi",
   "display_name": "Servidor MCP Efí",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "icon": "icon.svg",
   "description": "Acesso tipado às APIs da Efí por meio do Model Context Protocol.",
   "long_description": "Servidor local stdio com cobertura integral do SDK Node Efí 2.0.0. Expõe Cobranças, Pix, Open Finance, Pagamento de Contas, Abertura de Contas e Extratos, com contratos Zod oficiais e execução protegida para respostas sensíveis.",
